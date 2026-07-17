@@ -68,6 +68,7 @@
             display: flex;
             gap: 6px;
             padding-left: 2px;
+            flex-wrap: wrap;
         }
 
             nav button {
@@ -476,6 +477,7 @@
                 <button class="tab-btn active" data-view="dashboard">Dashboard</button>
                 <button class="tab-btn" data-view="cashbook">Cash Book</button>
                 <button class="tab-btn" data-view="traders">Traders</button>
+                <button class="tab-btn" data-view="labor">Labor</button>
                 <button class="tab-btn" data-view="summary">Summary</button>
             </nav>
         </header>
@@ -535,6 +537,34 @@
                 </div>
             </div>
 
+            <!-- LABOR -->
+            <div class="view" id="view-labor">
+                <h2 class="section-title">Manage Labor</h2>
+                <div class="entry-form" style="margin-bottom:18px;">
+                    <div class="form-grid">
+                        <div class="field">
+                            <label>Labor Worker Name</label>
+                            <input type="text" id="labor-name" placeholder="e.g. Ramesh Kumar">
+                        </div>
+                        <div class="field">
+                            <label>Phone (optional)</label>
+                            <input type="text" id="labor-phone" placeholder="Phone number">
+                        </div>
+                    </div>
+                    <div class="form-actions">
+                        <button type="button" class="btn secondary" id="labor-cancel" style="display:none;">Cancel</button>
+                        <button type="button" class="btn" id="labor-save" onclick="addLabor()">Add worker</button>
+                    </div>
+                </div>
+
+                <div class="table-wrap">
+                    <table>
+                        <thead><tr><th>Worker Name</th><th>Phone</th><th></th></tr></thead>
+                        <tbody id="labor-body"></tbody>
+                    </table>
+                </div>
+            </div>
+
             <!-- CASH BOOK -->
             <div class="view" id="view-cashbook">
                 <div class="opening-row">
@@ -565,7 +595,7 @@
                             <select id="f-category"></select>
                         </div>
                         <div class="field">
-                            <label>Trader</label>
+                            <label id="trader-field-label">Trader / Labor</label>
                             <select id="f-trader"></select>
                         </div>
                         <div class="field">
@@ -589,7 +619,7 @@
                             <tr>
                                 <th>Date</th>
                                 <th>Description</th>
-                                <th>Trader</th>
+                                <th>Trader / Labor</th>
                                 <th>Category</th>
                                 <th style="text-align:right;">In</th>
                                 <th style="text-align:right;">Out</th>
@@ -637,15 +667,13 @@
         // ==========================================
         // --- SUPABASE CONFIGURATION ---
         // ==========================================
-        const SUPABASE_URL = 'https://ocnfbgubhqvyxidlsdir.supabase.co'; // <-- Replace on Line 409
-        const SUPABASE_ANON_KEY = 'sb_publishable_JmfXhemd49Ej1J_bST4dWg_r_BnOzX0'; // <-- Replace on Line 410
+        const SUPABASE_URL = 'https://ocnfbgubhqvyxidlsdir.supabase.co';
+        const SUPABASE_ANON_KEY = 'sb_publishable_JmfXhemd49Ej1J_bST4dWg_r_BnOzX0';
 
         const STORAGE_KEY = 'coconut-cashbook-data';
 
-        // Initialize the Supabase Client (DEFINED ONCE)
         const supabaseClient = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
 
-        // Storage abstraction layer to handle syncing state to Supabase Cloud
         window.storage = {
             async get(key) {
                 const note = document.getElementById('save-note');
@@ -698,10 +726,11 @@
             out: ["Coconut Purchase", "Labor Wages", "Transport/Freight", "Loading/Unloading", "Storage/Rent", "Electricity/Fuel", "Packing Material", "Maintenance", "Commission/Brokerage", "Loan Repayment", "Other Expense"]
         };
 
-        let state = { openingBalance: 0, entries: [], traders: [] };
+        let state = { openingBalance: 0, entries: [], traders: [], labor: [] };
         let currentType = 'in';
         let editingId = null;
         let traderEditingId = null;
+        let laborEditingId = null;
 
         function fmt(n) {
             n = Math.round(Number(n) || 0);
@@ -715,7 +744,6 @@
             return 'e' + Date.now().toString(36) + Math.random().toString(36).slice(2, 7);
         }
 
-        // Save/restore current form as a draft so user's in-progress entry isn't lost
         function saveDraft() {
             try {
                 const draft = {
@@ -741,6 +769,7 @@
                 if (draft.type) { currentType = draft.type; updateTypeButtons(); }
                 populateCategorySelect();
                 if (draft.category) document.getElementById('f-category').value = draft.category;
+                populateTraderSelect();
                 if (draft.trader && document.getElementById('f-trader')) document.getElementById('f-trader').value = draft.trader;
                 if (draft.amount) document.getElementById('f-amount').value = draft.amount;
                 if (typeof draft.notes === 'string') document.getElementById('f-notes').value = draft.notes;
@@ -757,7 +786,7 @@
             });
         }
 
-        // Global helper to add/save trader
+        // --- Traders Management ---
         async function addTrader() {
             const nameEl = document.getElementById('trader-name');
             const phoneEl = document.getElementById('trader-phone');
@@ -769,8 +798,8 @@
                 const t = state.traders.find(x => x.id === traderEditingId);
                 if (t) Object.assign(t, { name, phone });
                 traderEditingId = null;
-                const btn = document.getElementById('trader-save'); if (btn) btn.textContent = 'Add trader';
-                const cancel = document.getElementById('trader-cancel'); if (cancel) cancel.style.display = 'none';
+                document.getElementById('trader-save').textContent = 'Add trader';
+                document.getElementById('trader-cancel').style.display = 'none';
             } else {
                 state.traders.push({ id: uid(), name, phone });
             }
@@ -781,7 +810,6 @@
             populateTraderSelect();
         }
 
-        // --- Traders management ---
         function renderTraders() {
             const body = document.getElementById('traders-body');
             if (!body) return;
@@ -795,7 +823,6 @@
                 tr.innerHTML = `<td>${escapeHtml(t.name)}</td><td>${escapeHtml(t.phone || '')}</td><td class="row-actions"><button class="edit-trader" data-id="${t.id}">Edit</button><button class="del-trader" data-id="${t.id}">Delete</button></td>`;
                 body.appendChild(tr);
             });
-
             body.querySelectorAll('.edit-trader').forEach(b => b.addEventListener('click', () => startEditTrader(b.dataset.id)));
             body.querySelectorAll('.del-trader').forEach(b => b.addEventListener('click', () => deleteTraderWithConfirm(b.dataset.id)));
         }
@@ -818,40 +845,136 @@
             document.getElementById('trader-phone').value = '';
         }
 
-        async function deleteTrader(id) {
-            state.traders = state.traders.filter(t => t.id !== id);
-            state.entries.forEach(e => { if (e.trader === id) e.trader = ''; });
+        async function deleteTraderWithConfirm(id) {
+            const t = state.traders.find(x => x.id === id);
+            if (!t) return;
+            const refs = state.entries.filter(e => e.trader === id).length;
+            if (refs > 0) {
+                alert(`Trader "${t.name}" is referenced in cashbook entries and cannot be deleted.`);
+                return;
+            }
+            if (!confirm(`Delete trader "${t.name}"?`)) return;
+            state.traders = state.traders.filter(x => x.id !== id);
             await window.storage.set(STORAGE_KEY, JSON.stringify(state));
             renderTraders();
             populateTraderSelect();
             render();
         }
 
-        async function deleteTraderWithConfirm(id) {
-            const t = state.traders.find(x => x.id === id);
-            if (!t) return;
-            const refs = state.entries.filter(e => (e.trader === id) || (e.trader === t.name)).length;
-            if (refs > 0) {
-                alert(`Trader "${t.name}" is referenced in cashbook entries and cannot be deleted.`);
-                return;
-            }
-            if (!confirm(`Delete trader "${t.name}"?`)) return;
-            await deleteTrader(id);
-        }
-
         document.getElementById('trader-cancel').onclick = cancelEditTrader;
 
+        // --- Labor Management ---
+        async function addLabor() {
+            const nameEl = document.getElementById('labor-name');
+            const phoneEl = document.getElementById('labor-phone');
+            if (!nameEl) return;
+            const name = (nameEl.value || '').trim();
+            const phone = phoneEl ? (phoneEl.value || '').trim() : '';
+            if (!name) { alert('Enter a worker name.'); nameEl.focus(); return; }
+            if (laborEditingId) {
+                const l = state.labor.find(x => x.id === laborEditingId);
+                if (l) Object.assign(l, { name, phone });
+                laborEditingId = null;
+                document.getElementById('labor-save').textContent = 'Add worker';
+                document.getElementById('labor-cancel').style.display = 'none';
+            } else {
+                state.labor.push({ id: uid(), name, phone });
+            }
+            await window.storage.set(STORAGE_KEY, JSON.stringify(state));
+            nameEl.value = '';
+            if (phoneEl) phoneEl.value = '';
+            renderLabor();
+            populateTraderSelect();
+        }
+
+        function renderLabor() {
+            const body = document.getElementById('labor-body');
+            if (!body) return;
+            body.innerHTML = '';
+            if (!state.labor || state.labor.length === 0) {
+                body.innerHTML = '<tr><td colspan="3" class="empty-note" style="padding:18px;">No labor records yet. Add one above.</td></tr>';
+                return;
+            }
+            state.labor.forEach(l => {
+                const tr = document.createElement('tr');
+                tr.innerHTML = `<td>${escapeHtml(l.name)}</td><td>${escapeHtml(l.phone || '')}</td><td class="row-actions"><button class="edit-labor" data-id="${l.id}">Edit</button><button class="del-labor" data-id="${l.id}">Delete</button></td>`;
+                body.appendChild(tr);
+            });
+            body.querySelectorAll('.edit-labor').forEach(b => b.addEventListener('click', () => startEditLabor(b.dataset.id)));
+            body.querySelectorAll('.del-labor').forEach(b => b.addEventListener('click', () => deleteLaborWithConfirm(b.dataset.id)));
+        }
+
+        function startEditLabor(id) {
+            const l = state.labor.find(x => x.id === id);
+            if (!l) return;
+            laborEditingId = id;
+            document.getElementById('labor-name').value = l.name;
+            document.getElementById('labor-phone').value = l.phone || '';
+            document.getElementById('labor-save').textContent = 'Save changes';
+            document.getElementById('labor-cancel').style.display = 'inline-block';
+        }
+
+        function cancelEditLabor() {
+            laborEditingId = null;
+            document.getElementById('labor-save').textContent = 'Add worker';
+            document.getElementById('labor-cancel').style.display = 'none';
+            document.getElementById('labor-name').value = '';
+            document.getElementById('labor-phone').value = '';
+        }
+
+        async function deleteLaborWithConfirm(id) {
+            const l = state.labor.find(x => x.id === id);
+            if (!l) return;
+            const refs = state.entries.filter(e => e.trader === id).length;
+            if (refs > 0) {
+                alert(`Labor worker "${l.name}" is referenced in your cashbook and cannot be deleted.`);
+                return;
+            }
+            if (!confirm(`Delete worker "${l.name}"?`)) return;
+            state.labor = state.labor.filter(x => x.id !== id);
+            await window.storage.set(STORAGE_KEY, JSON.stringify(state));
+            renderLabor();
+            populateTraderSelect();
+            render();
+        }
+
+        document.getElementById('labor-cancel').onclick = cancelEditLabor;
+
+        // --- Dynamic Dropdown System ---
         function populateTraderSelect() {
             const sel = document.getElementById('f-trader');
+            const labelEl = document.getElementById('trader-field-label');
+            const categoryEl = document.getElementById('f-category');
             if (!sel) return;
+
             sel.innerHTML = '';
             const none = document.createElement('option'); none.value = ''; none.textContent = '— none —';
             sel.appendChild(none);
-            state.traders.forEach(t => {
-                const opt = document.createElement('option');
-                opt.value = t.id; opt.textContent = t.name + (t.phone ? (' — ' + t.phone) : '');
-                sel.appendChild(opt);
-            });
+
+            // If category is Labor Wages, switch field options to Labor Workers
+            if (categoryEl && categoryEl.value === "Labor Wages") {
+                if (labelEl) labelEl.textContent = "Labor Worker";
+                state.labor.forEach(l => {
+                    const opt = document.createElement('option');
+                    opt.value = l.id; opt.textContent = l.name + (l.phone ? (' — ' + l.phone) : '');
+                    sel.appendChild(opt);
+                });
+            } else {
+                if (labelEl) labelEl.textContent = "Trader";
+                state.traders.forEach(t => {
+                    const opt = document.createElement('option');
+                    opt.value = t.id; opt.textContent = t.name + (t.phone ? (' — ' + t.phone) : '');
+                    sel.appendChild(opt);
+                });
+            }
+        }
+
+        function getTraderOrLaborName(id) {
+            if (!id) return '';
+            const matchedTrader = state.traders.find(t => t.id === id);
+            if (matchedTrader) return matchedTrader.name;
+            const matchedLabor = state.labor.find(l => l.id === id);
+            return matchedLabor ? matchedLabor.name : '';
         }
 
         function sortedEntries() {
@@ -884,17 +1007,17 @@
             withBal.forEach(e => {
                 const tr = document.createElement('tr');
                 tr.innerHTML = `
-          <td>${e.date}</td>
-          <td>${escapeHtml(e.description || '')}</td>
-          <td>${e.trader ? escapeHtml((state.traders.find(t => t.id === e.trader) || { name: '' }).name) : ''}</td>
-          <td><span class="cat-tag">${escapeHtml(e.category)}</span></td>
-          <td class="num in">${e.type === 'in' ? fmt(e.amount) : ''}</td>
-          <td class="num out">${e.type === 'out' ? fmt(e.amount) : ''}</td>
-          <td class="num bal ${e.balance < 0 ? 'negative' : ''}">${fmt(e.balance)}</td>
-          <td class="row-actions">
-            <button data-edit="${e.id}">Edit</button>
-            <button data-del="${e.id}">Delete</button>
-          </td>`;
+              <td>${e.date}</td>
+              <td>${escapeHtml(e.description || '')}</td>
+              <td>${escapeHtml(getTraderOrLaborName(e.trader))}</td>
+              <td><span class="cat-tag">${escapeHtml(e.category)}</span></td>
+              <td class="num in">${e.type === 'in' ? fmt(e.amount) : ''}</td>
+              <td class="num out">${e.type === 'out' ? fmt(e.amount) : ''}</td>
+              <td class="num bal ${e.balance < 0 ? 'negative' : ''}">${fmt(e.balance)}</td>
+              <td class="row-actions">
+                <button data-edit="${e.id}">Edit</button>
+                <button data-del="${e.id}">Delete</button>
+              </td>`;
                 body.appendChild(tr);
             });
             body.querySelectorAll('[data-edit]').forEach(b => b.addEventListener('click', () => startEdit(b.dataset.edit)));
@@ -907,11 +1030,11 @@
             return d.innerHTML;
         }
 
-        // Setup traders save listener
         const traderSaveBtn = document.getElementById('trader-save');
-        if (traderSaveBtn) {
-            traderSaveBtn.onclick = addTrader;
-        }
+        if (traderSaveBtn) traderSaveBtn.onclick = addTrader;
+
+        const laborSaveBtn = document.getElementById('labor-save');
+        if (laborSaveBtn) laborSaveBtn.onclick = addLabor;
 
         function renderDashboard() {
             const withBal = computeBalances();
@@ -937,12 +1060,13 @@
             }
             recent.forEach(e => {
                 const li = document.createElement('li');
+                const relationshipName = getTraderOrLaborName(e.trader);
                 li.innerHTML = `
-          <div>
-            <div class="desc">${escapeHtml(e.description || e.category)}</div>
-            <div class="meta">${e.date} · ${escapeHtml(e.category)}${e.trader ? (' · ' + escapeHtml((state.traders.find(t => t.id === e.trader) || { name: '' }).name)) : ''}</div>
-          </div>
-          <div class="amt ${e.type}">${e.type === 'in' ? '+' : '−'}${fmt(e.amount)}</div>`;
+              <div>
+                <div class="desc">${escapeHtml(e.description || e.category)}</div>
+                <div class="meta">${e.date} · ${escapeHtml(e.category)}${relationshipName ? (' · ' + escapeHtml(relationshipName)) : ''}</div>
+              </div>
+              <div class="amt ${e.type}">${e.type === 'in' ? '+' : '−'}${fmt(e.amount)}</div>`;
                 list.appendChild(li);
             });
         }
@@ -991,19 +1115,17 @@
             editingId = id;
             currentType = e.type;
 
-            // 1. Switch the view first so the tab click event sets up the layout
             document.querySelector('[data-view="cashbook"]').click();
 
-            // 2. Explicitly ensure both dropdowns are freshly populated
             updateTypeButtons();
             populateCategorySelect();
-            populateTraderSelect(); // Make sure the trader options are there!
+            // Set the value directly to check against category condition
+            document.getElementById('f-category').value = e.category;
+            populateTraderSelect();
 
-            // 3. Now fill in the form inputs
             document.getElementById('f-date').value = e.date;
             document.getElementById('f-desc').value = e.description || '';
             document.getElementById('f-trader').value = e.trader || '';
-            document.getElementById('f-category').value = e.category;
             document.getElementById('f-amount').value = e.amount;
             document.getElementById('f-notes').value = e.notes || '';
 
@@ -1027,6 +1149,7 @@
             document.getElementById('f-trader').value = '';
             document.getElementById('f-notes').value = '';
             populateCategorySelect();
+            populateTraderSelect();
             try { localStorage.removeItem(DRAFT_KEY); } catch (e) { }
         }
 
@@ -1046,7 +1169,12 @@
                 currentType = btn.dataset.type;
                 updateTypeButtons();
                 populateCategorySelect();
+                populateTraderSelect();
             });
+        });
+
+        document.getElementById('f-category').addEventListener('change', () => {
+            populateTraderSelect();
         });
 
         document.querySelectorAll('.tab-btn').forEach(btn => {
@@ -1055,25 +1183,12 @@
                 document.querySelectorAll('.view').forEach(v => v.classList.remove('active'));
                 btn.classList.add('active');
                 document.getElementById('view-' + btn.dataset.view).classList.add('active');
-            });
-        });
 
-        document.querySelectorAll('.tab-btn').forEach(btn => {
-            btn.addEventListener('click', () => {
                 if (btn.dataset.view === 'traders') renderTraders();
+                if (btn.dataset.view === 'labor') renderLabor();
                 if (btn.dataset.view === 'cashbook') populateTraderSelect();
             });
         });
-
-        const tradersTabBtn = document.querySelector('.tab-btn[data-view="traders"]');
-        if (tradersTabBtn) {
-            tradersTabBtn.addEventListener('click', () => {
-                document.querySelectorAll('.view').forEach(v => v.classList.remove('active'));
-                const vt = document.getElementById('view-traders');
-                if (vt) vt.classList.add('active');
-                try { renderTraders(); populateTraderSelect(); const tbtn = document.getElementById('trader-save'); if (tbtn) tbtn.style.display = 'inline-block'; } catch (e) { }
-            });
-        }
 
         document.getElementById('save-entry').addEventListener('click', async () => {
             const date = document.getElementById('f-date').value || todayStr();
@@ -1130,13 +1245,11 @@
         });
 
         async function init() {
-            // 1. Instantly set up the local UI structure so it doesn't hang
             document.getElementById('f-date').value = todayStr();
             populateCategorySelect();
             populateTraderSelect();
             loadDraft();
 
-            // 2. Load cached local data first so the app works immediately
             try {
                 const localRaw = localStorage.getItem(STORAGE_KEY);
                 if (localRaw) {
@@ -1144,16 +1257,17 @@
                     state.openingBalance = Number(parsed.openingBalance) || 0;
                     state.entries = Array.isArray(parsed.entries) ? parsed.entries : [];
                     state.traders = Array.isArray(parsed.traders) ? parsed.traders : [];
+                    state.labor = Array.isArray(parsed.labor) ? parsed.labor : [];
 
                     document.getElementById('opening-input').value = state.openingBalance;
                     renderTraders();
+                    renderLabor();
                     render();
                 }
             } catch (e) {
                 console.log("Local cache empty or unreadable");
             }
 
-            // 3. Attempt cloud sync in the background without blocking the UI
             try {
                 const res = await window.storage.get(STORAGE_KEY);
                 if (res && res.value) {
@@ -1161,16 +1275,17 @@
                     state.openingBalance = Number(parsed.openingBalance) || 0;
                     state.entries = Array.isArray(parsed.entries) ? parsed.entries : [];
                     state.traders = Array.isArray(parsed.traders) ? parsed.traders : [];
+                    state.labor = Array.isArray(parsed.labor) ? parsed.labor : [];
 
                     document.getElementById('opening-input').value = state.openingBalance;
                     renderTraders();
+                    renderLabor();
                     render();
                 }
             } catch (e) {
                 console.error("Cloud initialization error:", e);
             }
 
-            // Remove the stuck connection message if it hasn't updated
             const note = document.getElementById('save-note');
             if (note && note.textContent === 'Connecting to cloud database...') {
                 note.textContent = 'App ready. Syncing updates in background...';
@@ -1191,6 +1306,7 @@
             }, 10000);
 
             const tbtn = document.getElementById('trader-save'); if (tbtn) tbtn.style.display = 'inline-block';
+            const lbtn = document.getElementById('labor-save'); if (lbtn) lbtn.style.display = 'inline-block';
         }
         init();
     </script>
