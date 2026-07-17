@@ -1,0 +1,1198 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Coconut Cash Book</title>
+    <!-- Include the Supabase JS library from CDN -->
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+    <style>
+        :root {
+            --paper: #F6F3E7;
+            --paper-dark: #EFEAD8;
+            --husk: #5B3A20;
+            --husk-dark: #3E2712;
+            --palm: #2E5233;
+            --palm-dark: #1D3921;
+            --rust: #8A3A26;
+            --rust-dark: #5E2717;
+            --copra: #C9A15F;
+            --ink: #2B2419;
+            --ink-soft: #6B5F4D;
+            --line: #D9D0B8;
+            --card: #FFFDF6;
+        }
+
+        * {
+            box-sizing: border-box;
+        }
+
+        body {
+            margin: 0;
+            font-family: Georgia, 'Times New Roman', serif;
+            background: var(--paper);
+            color: var(--ink);
+            -webkit-font-smoothing: antialiased;
+        }
+
+        .app {
+            max-width: 920px;
+            margin: 0 auto;
+            padding: 0 0 60px;
+        }
+
+        /* Header */
+        header {
+            background: var(--husk);
+            color: #F6F3E7;
+            padding: 22px 24px 0;
+            position: relative;
+        }
+
+            header h1 {
+                margin: 0 0 4px;
+                font-size: 26px;
+                font-weight: normal;
+                letter-spacing: 0.3px;
+            }
+
+            header p {
+                margin: 0 0 18px;
+                font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+                font-size: 12.5px;
+                color: #D8C9B3;
+            }
+
+        /* Tab navigation styled as ledger binder tabs */
+        nav {
+            display: flex;
+            gap: 6px;
+            padding-left: 2px;
+        }
+
+            nav button {
+                font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+                font-size: 13.5px;
+                font-weight: 600;
+                letter-spacing: 0.2px;
+                padding: 10px 18px 12px;
+                border: none;
+                background: var(--husk-dark);
+                color: #C9BBA5;
+                cursor: pointer;
+                border-radius: 8px 8px 0 0;
+                position: relative;
+                top: 1px;
+            }
+
+                nav button.active {
+                    background: var(--paper);
+                    color: var(--husk-dark);
+                }
+
+        main {
+            background: var(--paper);
+            padding: 24px;
+            min-height: 400px;
+        }
+
+        .view {
+            display: none;
+        }
+
+            .view.active {
+                display: block;
+            }
+
+        /* Sans-serif utility class for data/UI chrome */
+        .ui {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+        }
+
+        /* KPI cards */
+        .kpis {
+            display: grid;
+            grid-template-columns: repeat(auto-fit,minmax(180px,1fr));
+            gap: 12px;
+            margin-bottom: 24px;
+        }
+
+        .kpi {
+            background: var(--card);
+            border: 1px solid var(--line);
+            border-radius: 10px;
+            padding: 14px 16px;
+        }
+
+            .kpi .label {
+                font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+                font-size: 11px;
+                text-transform: uppercase;
+                letter-spacing: 0.6px;
+                color: var(--ink-soft);
+                margin-bottom: 6px;
+            }
+
+            .kpi .value {
+                font-size: 22px;
+                color: var(--husk-dark);
+            }
+
+            .kpi.in .value {
+                color: var(--palm-dark);
+            }
+
+            .kpi.out .value {
+                color: var(--rust-dark);
+            }
+
+            .kpi.balance {
+                border-color: var(--husk);
+                border-width: 1.5px;
+            }
+
+        h2.section-title {
+            font-size: 16px;
+            font-weight: normal;
+            color: var(--husk-dark);
+            margin: 0 0 12px;
+            padding-bottom: 8px;
+            border-bottom: 2px solid var(--copra);
+            display: inline-block;
+        }
+
+        /* Recent transactions list on dashboard */
+        .recent-list {
+            list-style: none;
+            margin: 0;
+            padding: 0;
+        }
+
+            .recent-list li {
+                display: flex;
+                justify-content: space-between;
+                align-items: center;
+                padding: 10px 0;
+                border-bottom: 1px solid var(--line);
+                font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+                font-size: 13.5px;
+            }
+
+                .recent-list li:last-child {
+                    border-bottom: none;
+                }
+
+            .recent-list .desc {
+                color: var(--ink);
+            }
+
+            .recent-list .meta {
+                color: var(--ink-soft);
+                font-size: 11.5px;
+            }
+
+            .recent-list .amt.in {
+                color: var(--palm-dark);
+                font-weight: 600;
+            }
+
+            .recent-list .amt.out {
+                color: var(--rust-dark);
+                font-weight: 600;
+            }
+
+        .empty-note {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+            color: var(--ink-soft);
+            font-size: 13px;
+            padding: 20px 0;
+            text-align: center;
+        }
+
+        /* Entry form */
+        .entry-form {
+            background: var(--card);
+            border: 1px solid var(--line);
+            border-radius: 10px;
+            padding: 18px;
+            margin-bottom: 22px;
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+        }
+
+        .form-grid {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 12px;
+        }
+
+            .form-grid .full {
+                grid-column: 1/-1;
+            }
+
+        .field label {
+            display: block;
+            font-size: 11px;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+            color: var(--ink-soft);
+            margin-bottom: 4px;
+        }
+
+        .field input, .field select {
+            width: 100%;
+            padding: 8px 10px;
+            border: 1px solid var(--line);
+            border-radius: 6px;
+            background: #fff;
+            font-size: 14px;
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+            color: var(--ink);
+        }
+
+            .field input:focus, .field select:focus {
+                outline: none;
+                border-color: var(--husk);
+            }
+
+        .type-toggle {
+            display: flex;
+            gap: 8px;
+        }
+
+            .type-toggle button {
+                flex: 1;
+                padding: 9px;
+                border: 1px solid var(--line);
+                border-radius: 6px;
+                background: #fff;
+                cursor: pointer;
+                font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+                font-size: 13px;
+                font-weight: 600;
+                color: var(--ink-soft);
+            }
+
+                .type-toggle button.sel-in.selected {
+                    background: var(--palm);
+                    color: #fff;
+                    border-color: var(--palm-dark);
+                }
+
+                .type-toggle button.sel-out.selected {
+                    background: var(--rust);
+                    color: #fff;
+                    border-color: var(--rust-dark);
+                }
+
+        .form-actions {
+            display: flex;
+            justify-content: flex-end;
+            gap: 10px;
+            margin-top: 14px;
+        }
+
+        .btn {
+            padding: 9px 18px;
+            border-radius: 6px;
+            border: 1px solid var(--husk);
+            background: var(--husk);
+            color: #fff;
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+            font-size: 13.5px;
+            font-weight: 600;
+            cursor: pointer;
+        }
+
+            .btn.secondary {
+                background: transparent;
+                color: var(--husk);
+            }
+
+            .btn:active {
+                transform: scale(0.98);
+            }
+
+        /* Ledger table */
+        .table-wrap {
+            background: var(--card);
+            border: 1px solid var(--line);
+            border-radius: 10px;
+            overflow: hidden;
+        }
+
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+            font-size: 13px;
+        }
+
+        thead th {
+            background: var(--husk-dark);
+            color: #EFE7D6;
+            text-align: left;
+            padding: 10px 12px;
+            font-weight: 600;
+            font-size: 11px;
+            text-transform: uppercase;
+            letter-spacing: 0.4px;
+        }
+
+        tbody td {
+            padding: 9px 12px;
+            border-bottom: 1px solid var(--line);
+            color: var(--ink);
+        }
+
+        tbody tr:nth-child(even) {
+            background: var(--paper-dark);
+        }
+
+        tbody tr:hover {
+            background: #F0E9D5;
+        }
+
+        td.num {
+            text-align: right;
+            font-variant-numeric: tabular-nums;
+        }
+
+        td.in {
+            color: var(--palm-dark);
+        }
+
+        td.out {
+            color: var(--rust-dark);
+        }
+
+        td.bal {
+            font-weight: 700;
+            color: var(--husk-dark);
+        }
+
+            td.bal.negative {
+                color: var(--rust-dark);
+            }
+
+        .cat-tag {
+            display: inline-block;
+            font-size: 11px;
+            padding: 2px 8px;
+            border-radius: 12px;
+            background: var(--paper-dark);
+            color: var(--ink-soft);
+        }
+
+        .row-actions {
+            white-space: nowrap;
+        }
+
+            .row-actions button {
+                border: none;
+                background: none;
+                cursor: pointer;
+                font-size: 12px;
+                color: var(--ink-soft);
+                margin-right: 6px;
+                font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+            }
+
+                .row-actions button:hover {
+                    color: var(--husk-dark);
+                    text-decoration: underline;
+                }
+
+        /* Summary tables */
+        .summary-grid {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 20px;
+            margin-top: 8px;
+        }
+
+        @media (max-width:640px) {
+            .summary-grid {
+                grid-template-columns: 1fr;
+            }
+
+            .form-grid {
+                grid-template-columns: 1fr;
+            }
+        }
+
+        .summary-grid table td:first-child, .summary-grid table th:first-child {
+            padding-left: 14px;
+        }
+
+        .total-row td {
+            font-weight: 700;
+            border-top: 2px solid var(--husk);
+            background: var(--paper-dark);
+        }
+
+        .opening-row {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            margin-bottom: 20px;
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+            font-size: 13.5px;
+            color: var(--ink-soft);
+        }
+
+            .opening-row input {
+                width: 130px;
+                padding: 6px 9px;
+                border: 1px solid var(--line);
+                border-radius: 6px;
+                font-size: 13.5px;
+            }
+
+            .opening-row button {
+                padding: 6px 12px;
+                border-radius: 6px;
+                border: 1px solid var(--husk);
+                background: transparent;
+                color: var(--husk);
+                cursor: pointer;
+                font-size: 12.5px;
+            }
+
+        .save-note {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+            font-size: 11.5px;
+            color: var(--ink-soft);
+            text-align: center;
+            margin-top: 16px;
+        }
+    </style>
+</head>
+<body>
+    <div class="app">
+        <header>
+            <h1>Coconut Cash Book</h1>
+            <p>Track cash in and cash out for the coconut business — saved automatically</p>
+            <nav>
+                <button class="tab-btn active" data-view="dashboard">Dashboard</button>
+                <button class="tab-btn" data-view="cashbook">Cash Book</button>
+                <button class="tab-btn" data-view="traders">Traders</button>
+                <button class="tab-btn" data-view="summary">Summary</button>
+            </nav>
+        </header>
+
+        <main>
+            <!-- DASHBOARD -->
+            <div class="view active" id="view-dashboard">
+                <div class="kpis">
+                    <div class="kpi balance">
+                        <div class="label">Current cash balance</div>
+                        <div class="value" id="kpi-balance">₹0</div>
+                    </div>
+
+                    <div class="kpi in">
+                        <div class="label">Total cash in</div>
+                        <div class="value" id="kpi-in">₹0</div>
+                    </div>
+                    <div class="kpi out">
+                        <div class="label">Total cash out</div>
+                        <div class="value" id="kpi-out">₹0</div>
+                    </div>
+                    <div class="kpi">
+                        <div class="label">This month, net</div>
+                        <div class="value" id="kpi-month-net">₹0</div>
+                    </div>
+                </div>
+
+                <h2 class="section-title">Recent entries</h2>
+                <ul class="recent-list" id="recent-list"></ul>
+            </div>
+
+            <!-- TRADERS -->
+            <div class="view" id="view-traders">
+                <h2 class="section-title">Manage Traders</h2>
+                <div class="entry-form" style="margin-bottom:18px;">
+                    <div class="form-grid">
+                        <div class="field">
+                            <label>Name</label>
+                            <input type="text" id="trader-name" placeholder="e.g. Murugan Traders">
+                        </div>
+                        <div class="field">
+                            <label>Phone (optional)</label>
+                            <input type="text" id="trader-phone" placeholder="Phone number">
+                        </div>
+                    </div>
+                    <div class="form-actions">
+                        <button type="button" class="btn secondary" id="trader-cancel" style="display:none;">Cancel</button>
+                        <button type="button" class="btn" id="trader-save" onclick="addTrader()">Add trader</button>
+                    </div>
+                </div>
+
+                <div class="table-wrap">
+                    <table>
+                        <thead><tr><th>Trader</th><th>Phone</th><th></th></tr></thead>
+                        <tbody id="traders-body"></tbody>
+                    </table>
+                </div>
+            </div>
+
+            <!-- CASH BOOK -->
+            <div class="view" id="view-cashbook">
+                <div class="opening-row">
+                    <span>Opening cash balance</span>
+                    <input type="number" id="opening-input" step="1" disabled>
+                    <button class="ui" id="opening-save">Edit</button>
+                </div>
+
+                <div class="entry-form">
+                    <div class="form-grid">
+                        <div class="field">
+                            <label>Type</label>
+                            <div class="type-toggle">
+                                <button type="button" class="sel-in selected" data-type="in">Cash in</button>
+                                <button type="button" class="sel-out" data-type="out">Cash out</button>
+                            </div>
+                        </div>
+                        <div class="field">
+                            <label>Date</label>
+                            <input type="date" id="f-date">
+                        </div>
+                        <div class="field full">
+                            <label>Description</label>
+                            <input type="text" id="f-desc" placeholder="e.g. Sold 500 coconuts to Murugan Traders">
+                        </div>
+                        <div class="field">
+                            <label>Category</label>
+                            <select id="f-category"></select>
+                        </div>
+                        <div class="field">
+                            <label>Trader</label>
+                            <select id="f-trader"></select>
+                        </div>
+                        <div class="field">
+                            <label>Amount (₹)</label>
+                            <input type="number" id="f-amount" min="0" step="1" placeholder="0">
+                        </div>
+                        <div class="field full">
+                            <label>Notes (optional)</label>
+                            <input type="text" id="f-notes" placeholder="Any extra detail">
+                        </div>
+                    </div>
+                    <div class="form-actions">
+                        <button class="btn secondary" id="cancel-edit" style="display:none;">Cancel</button>
+                        <button class="btn" id="save-entry">Add entry</button>
+                    </div>
+                </div>
+
+                <div class="table-wrap">
+                    <table>
+                        <thead>
+                            <tr>
+                                <th>Date</th>
+                                <th>Description</th>
+                                <th>Trader</th>
+                                <th>Category</th>
+                                <th style="text-align:right;">In</th>
+                                <th style="text-align:right;">Out</th>
+                                <th style="text-align:right;">Balance</th>
+                                <th></th>
+                            </tr>
+                        </thead>
+                        <tbody id="entries-body"></tbody>
+                    </table>
+                </div>
+            </div>
+
+            <!-- SUMMARY -->
+            <div class="view" id="view-summary">
+                <h2 class="section-title">Monthly summary</h2>
+                <div class="table-wrap" style="margin-bottom:26px;">
+                    <table>
+                        <thead><tr><th>Month</th><th style="text-align:right;">Cash in</th><th style="text-align:right;">Cash out</th><th style="text-align:right;">Net</th></tr></thead>
+                        <tbody id="monthly-body"></tbody>
+                    </table>
+                </div>
+
+                <h2 class="section-title">Category summary</h2>
+                <div class="summary-grid">
+                    <div class="table-wrap">
+                        <table>
+                            <thead><tr><th>Cash in by category</th><th style="text-align:right;">Total</th></tr></thead>
+                            <tbody id="cat-in-body"></tbody>
+                        </table>
+                    </div>
+                    <div class="table-wrap">
+                        <table>
+                            <thead><tr><th>Cash out by category</th><th style="text-align:right;">Total</th></tr></thead>
+                            <tbody id="cat-out-body"></tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+
+            <p class="save-note" id="save-note">Connecting to cloud database...</p>
+        </main>
+    </div>
+
+    <script>
+        // ==========================================
+        // --- SUPABASE CONFIGURATION ---
+        // ==========================================
+        const SUPABASE_URL = 'https://ocnfbgubhqvyxidlsdir.supabase.co'; // <-- Replace on Line 409
+        const SUPABASE_ANON_KEY = 'sb_publishable_JmfXhemd49Ej1J_bST4dWg_r_BnOzX0'; // <-- Replace on Line 410
+
+        const STORAGE_KEY = 'coconut-cashbook-data';
+
+        // Initialize the Supabase Client (DEFINED ONCE)
+        const supabaseClient = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+
+        // Storage abstraction layer to handle syncing state to Supabase Cloud
+        window.storage = {
+            async get(key) {
+                const note = document.getElementById('save-note');
+                try {
+                    const { data, error } = await supabaseClient
+                        .from('app_state')
+                        .select('state')
+                        .eq('id', 'main')
+                        .single();
+
+                    if (error && error.code !== 'PGRST116') throw error;
+
+                    if (data && data.state) {
+                        if (note) note.textContent = 'Data synced from Cloud Database.';
+                        return { value: JSON.stringify(data.state) };
+                    }
+                    return { value: localStorage.getItem(key) };
+                } catch (e) {
+                    console.error("Database read error:", e);
+                    if (note) note.textContent = 'Offline. Showing cached local data.';
+                    return { value: localStorage.getItem(key) };
+                }
+            },
+            async set(key, value) {
+                const note = document.getElementById('save-note');
+                try {
+                    localStorage.setItem(key, value);
+                    if (note) note.textContent = 'Syncing updates...';
+
+                    const parsedState = JSON.parse(value);
+                    const { error } = await supabaseClient
+                        .from('app_state')
+                        .upsert({ id: 'main', state: parsedState }, { onConflict: 'id' });
+
+                    if (error) throw error;
+                    if (note) note.textContent = 'All data is saved automatically to the cloud.';
+                    return true;
+                } catch (e) {
+                    console.error("Database write error:", e);
+                    if (note) note.textContent = 'Pending sync. Saved locally.';
+                    throw e;
+                }
+            }
+        };
+
+        const DRAFT_KEY = 'coconut-cashbook-draft';
+
+        const CATEGORIES = {
+            in: ["Coconut Sales", "Copra Sales", "Coconut Oil Sales", "Coconut Water Sales", "Husk/Shell Sales", "Advance Received", "Other Income"],
+            out: ["Coconut Purchase", "Labor Wages", "Transport/Freight", "Loading/Unloading", "Storage/Rent", "Electricity/Fuel", "Packing Material", "Maintenance", "Commission/Brokerage", "Loan Repayment", "Other Expense"]
+        };
+
+        let state = { openingBalance: 0, entries: [], traders: [] };
+        let currentType = 'in';
+        let editingId = null;
+        let traderEditingId = null;
+
+        function fmt(n) {
+            n = Math.round(Number(n) || 0);
+            return '₹' + n.toLocaleString('en-IN');
+        }
+        function todayStr() {
+            const d = new Date();
+            return d.toISOString().slice(0, 10);
+        }
+        function uid() {
+            return 'e' + Date.now().toString(36) + Math.random().toString(36).slice(2, 7);
+        }
+
+        // Save/restore current form as a draft so user's in-progress entry isn't lost
+        function saveDraft() {
+            try {
+                const draft = {
+                    date: document.getElementById('f-date').value,
+                    description: document.getElementById('f-desc').value,
+                    category: document.getElementById('f-category').value,
+                    trader: document.getElementById('f-trader') ? document.getElementById('f-trader').value : '',
+                    amount: document.getElementById('f-amount').value,
+                    notes: document.getElementById('f-notes').value,
+                    type: currentType
+                };
+                localStorage.setItem(DRAFT_KEY, JSON.stringify(draft));
+            } catch (e) { /* ignore */ }
+        }
+
+        function loadDraft() {
+            try {
+                const raw = localStorage.getItem(DRAFT_KEY);
+                if (!raw) return;
+                const draft = JSON.parse(raw);
+                if (draft.date) document.getElementById('f-date').value = draft.date;
+                if (typeof draft.description === 'string') document.getElementById('f-desc').value = draft.description;
+                if (draft.type) { currentType = draft.type; updateTypeButtons(); }
+                populateCategorySelect();
+                if (draft.category) document.getElementById('f-category').value = draft.category;
+                if (draft.trader && document.getElementById('f-trader')) document.getElementById('f-trader').value = draft.trader;
+                if (draft.amount) document.getElementById('f-amount').value = draft.amount;
+                if (typeof draft.notes === 'string') document.getElementById('f-notes').value = draft.notes;
+            } catch (e) { /* ignore */ }
+        }
+
+        function populateCategorySelect() {
+            const sel = document.getElementById('f-category');
+            sel.innerHTML = '';
+            CATEGORIES[currentType].forEach(c => {
+                const opt = document.createElement('option');
+                opt.value = c; opt.textContent = c;
+                sel.appendChild(opt);
+            });
+        }
+
+        // Global helper to add/save trader
+        async function addTrader() {
+            const nameEl = document.getElementById('trader-name');
+            const phoneEl = document.getElementById('trader-phone');
+            if (!nameEl) return;
+            const name = (nameEl.value || '').trim();
+            const phone = phoneEl ? (phoneEl.value || '').trim() : '';
+            if (!name) { alert('Enter a name for the trader.'); nameEl.focus(); return; }
+            if (traderEditingId) {
+                const t = state.traders.find(x => x.id === traderEditingId);
+                if (t) Object.assign(t, { name, phone });
+                traderEditingId = null;
+                const btn = document.getElementById('trader-save'); if (btn) btn.textContent = 'Add trader';
+                const cancel = document.getElementById('trader-cancel'); if (cancel) cancel.style.display = 'none';
+            } else {
+                state.traders.push({ id: uid(), name, phone });
+            }
+            await window.storage.set(STORAGE_KEY, JSON.stringify(state));
+            nameEl.value = '';
+            if (phoneEl) phoneEl.value = '';
+            renderTraders();
+            populateTraderSelect();
+        }
+
+        // --- Traders management ---
+        function renderTraders() {
+            const body = document.getElementById('traders-body');
+            if (!body) return;
+            body.innerHTML = '';
+            if (!state.traders || state.traders.length === 0) {
+                body.innerHTML = '<tr><td colspan="3" class="empty-note" style="padding:18px;">No traders yet. Add one above.</td></tr>';
+                return;
+            }
+            state.traders.forEach(t => {
+                const tr = document.createElement('tr');
+                tr.innerHTML = `<td>${escapeHtml(t.name)}</td><td>${escapeHtml(t.phone || '')}</td><td class="row-actions"><button class="edit-trader" data-id="${t.id}">Edit</button><button class="del-trader" data-id="${t.id}">Delete</button></td>`;
+                body.appendChild(tr);
+            });
+
+            body.querySelectorAll('.edit-trader').forEach(b => b.addEventListener('click', () => startEditTrader(b.dataset.id)));
+            body.querySelectorAll('.del-trader').forEach(b => b.addEventListener('click', () => deleteTraderWithConfirm(b.dataset.id)));
+        }
+
+        function startEditTrader(id) {
+            const t = state.traders.find(x => x.id === id);
+            if (!t) return;
+            traderEditingId = id;
+            document.getElementById('trader-name').value = t.name;
+            document.getElementById('trader-phone').value = t.phone || '';
+            document.getElementById('trader-save').textContent = 'Save changes';
+            document.getElementById('trader-cancel').style.display = 'inline-block';
+        }
+
+        function cancelEditTrader() {
+            traderEditingId = null;
+            document.getElementById('trader-save').textContent = 'Add trader';
+            document.getElementById('trader-cancel').style.display = 'none';
+            document.getElementById('trader-name').value = '';
+            document.getElementById('trader-phone').value = '';
+        }
+
+        async function deleteTrader(id) {
+            state.traders = state.traders.filter(t => t.id !== id);
+            state.entries.forEach(e => { if (e.trader === id) e.trader = ''; });
+            await window.storage.set(STORAGE_KEY, JSON.stringify(state));
+            renderTraders();
+            populateTraderSelect();
+            render();
+        }
+
+        async function deleteTraderWithConfirm(id) {
+            const t = state.traders.find(x => x.id === id);
+            if (!t) return;
+            const refs = state.entries.filter(e => (e.trader === id) || (e.trader === t.name)).length;
+            if (refs > 0) {
+                alert(`Trader "${t.name}" is referenced in cashbook entries and cannot be deleted.`);
+                return;
+            }
+            if (!confirm(`Delete trader "${t.name}"?`)) return;
+            await deleteTrader(id);
+        }
+
+        document.getElementById('trader-cancel').onclick = cancelEditTrader;
+
+        function populateTraderSelect() {
+            const sel = document.getElementById('f-trader');
+            if (!sel) return;
+            sel.innerHTML = '';
+            const none = document.createElement('option'); none.value = ''; none.textContent = '— none —';
+            sel.appendChild(none);
+            state.traders.forEach(t => {
+                const opt = document.createElement('option');
+                opt.value = t.id; opt.textContent = t.name + (t.phone ? (' — ' + t.phone) : '');
+                sel.appendChild(opt);
+            });
+        }
+
+        function sortedEntries() {
+            return [...state.entries].sort((a, b) => (a.date > b.date ? 1 : a.date < b.date ? -1 : (a._seq || 0) - (b._seq || 0)));
+        }
+
+        function computeBalances() {
+            const sorted = sortedEntries();
+            let bal = state.openingBalance;
+            return sorted.map(e => {
+                bal += (e.type === 'in' ? e.amount : -e.amount);
+                return { ...e, balance: bal };
+            });
+        }
+
+        function render() {
+            renderCashBook();
+            renderDashboard();
+            renderSummary();
+        }
+
+        function renderCashBook() {
+            const body = document.getElementById('entries-body');
+            body.innerHTML = '';
+            const withBal = computeBalances();
+            if (withBal.length === 0) {
+                body.innerHTML = '<tr><td colspan="8" class="empty-note" style="padding:24px;">No entries yet. Add your first transaction above.</td></tr>';
+                return;
+            }
+            withBal.forEach(e => {
+                const tr = document.createElement('tr');
+                tr.innerHTML = `
+          <td>${e.date}</td>
+          <td>${escapeHtml(e.description || '')}</td>
+          <td>${e.trader ? escapeHtml((state.traders.find(t => t.id === e.trader) || { name: '' }).name) : ''}</td>
+          <td><span class="cat-tag">${escapeHtml(e.category)}</span></td>
+          <td class="num in">${e.type === 'in' ? fmt(e.amount) : ''}</td>
+          <td class="num out">${e.type === 'out' ? fmt(e.amount) : ''}</td>
+          <td class="num bal ${e.balance < 0 ? 'negative' : ''}">${fmt(e.balance)}</td>
+          <td class="row-actions">
+            <button data-edit="${e.id}">Edit</button>
+            <button data-del="${e.id}">Delete</button>
+          </td>`;
+                body.appendChild(tr);
+            });
+            body.querySelectorAll('[data-edit]').forEach(b => b.addEventListener('click', () => startEdit(b.dataset.edit)));
+            body.querySelectorAll('[data-del]').forEach(b => b.addEventListener('click', () => deleteEntry(b.dataset.del)));
+        }
+
+        function escapeHtml(s) {
+            const d = document.createElement('div');
+            d.textContent = s;
+            return d.innerHTML;
+        }
+
+        // Setup traders save listener
+        const traderSaveBtn = document.getElementById('trader-save');
+        if (traderSaveBtn) {
+            traderSaveBtn.onclick = addTrader;
+        }
+
+        function renderDashboard() {
+            const withBal = computeBalances();
+            const totalIn = state.entries.filter(e => e.type === 'in').reduce((s, e) => s + e.amount, 0);
+            const totalOut = state.entries.filter(e => e.type === 'out').reduce((s, e) => s + e.amount, 0);
+            const balance = state.openingBalance + totalIn - totalOut;
+
+            document.getElementById('kpi-balance').textContent = fmt(balance);
+            document.getElementById('kpi-in').textContent = fmt(totalIn);
+            document.getElementById('kpi-out').textContent = fmt(totalOut);
+
+            const thisMonth = todayStr().slice(0, 7);
+            const mIn = state.entries.filter(e => e.type === 'in' && e.date.slice(0, 7) === thisMonth).reduce((s, e) => s + e.amount, 0);
+            const mOut = state.entries.filter(e => e.type === 'out' && e.date.slice(0, 7) === thisMonth).reduce((s, e) => s + e.amount, 0);
+            document.getElementById('kpi-month-net').textContent = fmt(mIn - mOut);
+
+            const list = document.getElementById('recent-list');
+            list.innerHTML = '';
+            const recent = [...withBal].reverse().slice(0, 6);
+            if (recent.length === 0) {
+                list.innerHTML = '<li class="empty-note">No transactions logged yet. Go to the Cash Book tab to add one.</li>';
+                return;
+            }
+            recent.forEach(e => {
+                const li = document.createElement('li');
+                li.innerHTML = `
+          <div>
+            <div class="desc">${escapeHtml(e.description || e.category)}</div>
+            <div class="meta">${e.date} · ${escapeHtml(e.category)}${e.trader ? (' · ' + escapeHtml((state.traders.find(t => t.id === e.trader) || { name: '' }).name)) : ''}</div>
+          </div>
+          <div class="amt ${e.type}">${e.type === 'in' ? '+' : '−'}${fmt(e.amount)}</div>`;
+                list.appendChild(li);
+            });
+        }
+
+        function renderSummary() {
+            const monthMap = {};
+            state.entries.forEach(e => {
+                const m = e.date ? e.date.slice(0, 7) : 'unknown';
+                if (!monthMap[m]) monthMap[m] = { in: 0, out: 0 };
+                monthMap[m][e.type] += e.amount;
+            });
+            const months = Object.keys(monthMap).sort();
+            const mbody = document.getElementById('monthly-body');
+            mbody.innerHTML = '';
+            if (months.length === 0) {
+                mbody.innerHTML = '<tr><td colspan="4" class="empty-note" style="padding:20px;">No data yet.</td></tr>';
+            } else {
+                months.forEach(m => {
+                    const { in: mi, out: mo } = monthMap[m];
+                    const tr = document.createElement('tr');
+                    tr.innerHTML = `<td>${m}</td><td class="num in">${fmt(mi)}</td><td class="num out">${fmt(mo)}</td><td class="num">${fmt(mi - mo)}</td>`;
+                    mbody.appendChild(tr);
+                });
+            }
+
+            const catIn = document.getElementById('cat-in-body');
+            const catOut = document.getElementById('cat-out-body');
+            catIn.innerHTML = ''; catOut.innerHTML = '';
+            CATEGORIES.in.forEach(c => {
+                const total = state.entries.filter(e => e.type === 'in' && e.category === c).reduce((s, e) => s + e.amount, 0);
+                const tr = document.createElement('tr');
+                tr.innerHTML = `<td>${c}</td><td class="num">${fmt(total)}</td>`;
+                catIn.appendChild(tr);
+            });
+            CATEGORIES.out.forEach(c => {
+                const total = state.entries.filter(e => e.type === 'out' && e.category === c).reduce((s, e) => s + e.amount, 0);
+                const tr = document.createElement('tr');
+                tr.innerHTML = `<td>${c}</td><td class="num">${fmt(total)}</td>`;
+                catOut.appendChild(tr);
+            });
+        }
+
+        function startEdit(id) {
+            const e = state.entries.find(x => x.id === id);
+            if (!e) return;
+            editingId = id;
+            currentType = e.type;
+
+            // 1. Switch the view first so the tab click event sets up the layout
+            document.querySelector('[data-view="cashbook"]').click();
+
+            // 2. Explicitly ensure both dropdowns are freshly populated
+            updateTypeButtons();
+            populateCategorySelect();
+            populateTraderSelect(); // Make sure the trader options are there!
+
+            // 3. Now fill in the form inputs
+            document.getElementById('f-date').value = e.date;
+            document.getElementById('f-desc').value = e.description || '';
+            document.getElementById('f-trader').value = e.trader || '';
+            document.getElementById('f-category').value = e.category;
+            document.getElementById('f-amount').value = e.amount;
+            document.getElementById('f-notes').value = e.notes || '';
+
+            document.getElementById('save-entry').textContent = 'Save changes';
+            document.getElementById('cancel-edit').style.display = 'inline-block';
+
+            window.scrollTo({ top: 0, behavior: 'smooth' });
+        }
+
+        function cancelEdit() {
+            editingId = null;
+            document.getElementById('save-entry').textContent = 'Add entry';
+            document.getElementById('cancel-edit').style.display = 'none';
+            clearForm();
+        }
+
+        function clearForm() {
+            document.getElementById('f-date').value = todayStr();
+            document.getElementById('f-desc').value = '';
+            document.getElementById('f-amount').value = '';
+            document.getElementById('f-trader').value = '';
+            document.getElementById('f-notes').value = '';
+            populateCategorySelect();
+            try { localStorage.removeItem(DRAFT_KEY); } catch (e) { }
+        }
+
+        async function deleteEntry(id) {
+            state.entries = state.entries.filter(e => e.id !== id);
+            await window.storage.set(STORAGE_KEY, JSON.stringify(state));
+            render();
+        }
+
+        function updateTypeButtons() {
+            document.querySelector('.sel-in').classList.toggle('selected', currentType === 'in');
+            document.querySelector('.sel-out').classList.toggle('selected', currentType === 'out');
+        }
+
+        document.querySelectorAll('.type-toggle button').forEach(btn => {
+            btn.addEventListener('click', () => {
+                currentType = btn.dataset.type;
+                updateTypeButtons();
+                populateCategorySelect();
+            });
+        });
+
+        document.querySelectorAll('.tab-btn').forEach(btn => {
+            btn.addEventListener('click', () => {
+                document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
+                document.querySelectorAll('.view').forEach(v => v.classList.remove('active'));
+                btn.classList.add('active');
+                document.getElementById('view-' + btn.dataset.view).classList.add('active');
+            });
+        });
+
+        document.querySelectorAll('.tab-btn').forEach(btn => {
+            btn.addEventListener('click', () => {
+                if (btn.dataset.view === 'traders') renderTraders();
+                if (btn.dataset.view === 'cashbook') populateTraderSelect();
+            });
+        });
+
+        const tradersTabBtn = document.querySelector('.tab-btn[data-view="traders"]');
+        if (tradersTabBtn) {
+            tradersTabBtn.addEventListener('click', () => {
+                document.querySelectorAll('.view').forEach(v => v.classList.remove('active'));
+                const vt = document.getElementById('view-traders');
+                if (vt) vt.classList.add('active');
+                try { renderTraders(); populateTraderSelect(); const tbtn = document.getElementById('trader-save'); if (tbtn) tbtn.style.display = 'inline-block'; } catch (e) { }
+            });
+        }
+
+        document.getElementById('save-entry').addEventListener('click', async () => {
+            const date = document.getElementById('f-date').value || todayStr();
+            const desc = document.getElementById('f-desc').value.trim();
+            const category = document.getElementById('f-category').value;
+            const amount = parseFloat(document.getElementById('f-amount').value);
+            const notes = document.getElementById('f-notes').value.trim();
+            const trader = document.getElementById('f-trader').value || '';
+
+            if (!amount || amount <= 0) {
+                alert('Enter an amount greater than 0.');
+                return;
+            }
+
+            const openingVal = parseFloat(document.getElementById('opening-input').value);
+            state.openingBalance = isNaN(openingVal) ? 0 : openingVal;
+
+            if (editingId) {
+                const e = state.entries.find(x => x.id === editingId);
+                Object.assign(e, { date, description: desc, category, type: currentType, amount, notes, trader });
+                editingId = null;
+                document.getElementById('save-entry').textContent = 'Add entry';
+                document.getElementById('cancel-edit').style.display = 'none';
+            } else {
+                state.entries.push({
+                    id: uid(), _seq: state.entries.length,
+                    date, description: desc, category, type: currentType, amount, notes, trader
+                });
+            }
+            await window.storage.set(STORAGE_KEY, JSON.stringify(state));
+            clearForm();
+            render();
+        });
+
+        document.getElementById('cancel-edit').addEventListener('click', cancelEdit);
+
+        document.getElementById('opening-save').addEventListener('click', async () => {
+            const btn = document.getElementById('opening-save');
+            const input = document.getElementById('opening-input');
+            if (input.disabled) {
+                input.disabled = false;
+                input.focus();
+                btn.textContent = 'Save';
+                btn.dataset.mode = 'editing';
+            } else {
+                const v = parseFloat(input.value);
+                state.openingBalance = isNaN(v) ? 0 : v;
+                input.disabled = true;
+                btn.textContent = 'Edit';
+                delete btn.dataset.mode;
+                await window.storage.set(STORAGE_KEY, JSON.stringify(state));
+                render();
+            }
+        });
+
+        async function init() {
+            // 1. Instantly set up the local UI structure so it doesn't hang
+            document.getElementById('f-date').value = todayStr();
+            populateCategorySelect();
+            populateTraderSelect();
+            loadDraft();
+
+            // 2. Load cached local data first so the app works immediately
+            try {
+                const localRaw = localStorage.getItem(STORAGE_KEY);
+                if (localRaw) {
+                    const parsed = JSON.parse(localRaw);
+                    state.openingBalance = Number(parsed.openingBalance) || 0;
+                    state.entries = Array.isArray(parsed.entries) ? parsed.entries : [];
+                    state.traders = Array.isArray(parsed.traders) ? parsed.traders : [];
+
+                    document.getElementById('opening-input').value = state.openingBalance;
+                    renderTraders();
+                    render();
+                }
+            } catch (e) {
+                console.log("Local cache empty or unreadable");
+            }
+
+            // 3. Attempt cloud sync in the background without blocking the UI
+            try {
+                const res = await window.storage.get(STORAGE_KEY);
+                if (res && res.value) {
+                    const parsed = JSON.parse(res.value);
+                    state.openingBalance = Number(parsed.openingBalance) || 0;
+                    state.entries = Array.isArray(parsed.entries) ? parsed.entries : [];
+                    state.traders = Array.isArray(parsed.traders) ? parsed.traders : [];
+
+                    document.getElementById('opening-input').value = state.openingBalance;
+                    renderTraders();
+                    render();
+                }
+            } catch (e) {
+                console.error("Cloud initialization error:", e);
+            }
+
+            // Remove the stuck connection message if it hasn't updated
+            const note = document.getElementById('save-note');
+            if (note && note.textContent === 'Connecting to cloud database...') {
+                note.textContent = 'App ready. Syncing updates in background...';
+            }
+
+            ['f-date', 'f-desc', 'f-category', 'f-amount', 'f-notes', 'f-trader'].forEach(id => {
+                const el = document.getElementById(id);
+                if (!el) return;
+                el.addEventListener('input', () => {
+                    saveDraft();
+                });
+            });
+
+            setInterval(async () => {
+                try {
+                    await window.storage.set(STORAGE_KEY, JSON.stringify(state));
+                } catch (e) { }
+            }, 10000);
+
+            const tbtn = document.getElementById('trader-save'); if (tbtn) tbtn.style.display = 'inline-block';
+        }
+        init();
+    </script>
+</body>
+</html>
