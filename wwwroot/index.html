@@ -45,7 +45,6 @@
         header {
             background: var(--husk);
             color: #F6F3E7;
-            /* Uses the safe area value if present, otherwise defaults to 22px */
             padding: calc(22px + env(safe-area-inset-top, 0px)) 24px 0;
             position: relative;
         }
@@ -106,7 +105,6 @@
                 display: block;
             }
 
-        /* Sans-serif utility class for data/UI chrome */
         .ui {
             font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
         }
@@ -163,7 +161,6 @@
             display: inline-block;
         }
 
-        /* Recent transactions list on dashboard */
         .recent-list {
             list-style: none;
             margin: 0;
@@ -435,7 +432,6 @@
                     text-decoration: underline;
                 }
 
-        /* Summary tables */
         .summary-grid {
             display: grid;
             grid-template-columns: 1fr 1fr;
@@ -499,8 +495,7 @@
             margin-top: 16px;
         }
 
-        /* Add this inside your <style> tag */
-        .filter-toggle button {
+        .filter-toggle button, .date-filter-toggle button {
             flex: 1;
             padding: 9px;
             border: 1px solid var(--line);
@@ -513,7 +508,7 @@
             color: var(--ink-soft);
         }
 
-            .filter-toggle button.selected {
+            .filter-toggle button.selected, .date-filter-toggle button.selected {
                 background: var(--husk);
                 color: #fff;
                 border-color: var(--husk-dark);
@@ -524,10 +519,11 @@
     <div class="app">
         <header>
             <h1>Coconut Cash Book</h1>
-            <p>Track cash in and cash out for the coconut business — saved automatically</p>
+            <p>Track cash and stock levels dynamically — saved automatically</p>
             <nav>
                 <button class="tab-btn active" data-view="dashboard">Dashboard</button>
                 <button class="tab-btn" data-view="cashbook">Cash Book</button>
+                <button class="tab-btn" data-view="inventory">Stock Ledger</button>
                 <button class="tab-btn" data-view="traders">Traders</button>
                 <button class="tab-btn" data-view="labor">Labor</button>
                 <button class="tab-btn" data-view="summary">Summary</button>
@@ -542,7 +538,6 @@
                         <div class="label">Current cash balance</div>
                         <div class="value" id="kpi-balance">₹0</div>
                     </div>
-
                     <div class="kpi in">
                         <div class="label">Total cash in</div>
                         <div class="value" id="kpi-in">₹0</div>
@@ -559,6 +554,65 @@
 
                 <h2 class="section-title">Recent entries</h2>
                 <ul class="recent-list" id="recent-list"></ul>
+            </div>
+
+            <!-- INVENTORY / STOCK LEDGER -->
+            <div class="view" id="view-inventory">
+                <h2 class="section-title">Stock Status Balance Summary</h2>
+                <div class="kpis" id="stock-kpis" style="margin-bottom: 26px;">
+                    <!-- Rendered dynamically by JS -->
+                </div>
+
+                <!-- UNIFIED BATCH ENTRY FORM -->
+                <h2 class="section-title">Log Coconut Processing Batch</h2>
+                <div class="entry-form" style="margin-bottom: 22px;">
+                    <div class="form-grid">
+                        <div class="field">
+                            <label>Date *</label>
+                            <input type="date" id="stk-date" required>
+                        </div>
+                        <div class="field">
+                            <label>Raw Coconuts Used (Reduction) *</label>
+                            <input type="number" id="stk-input-coconuts" placeholder="e.g. 3300" required>
+                        </div>
+                        <div class="field">
+                            <label>Copra Produced (KG Addition)</label>
+                            <input type="number" id="stk-out-copra" placeholder="e.g. 300">
+                        </div>
+                        <div class="field">
+                            <label>Husk/Shell Produced (Units Addition)</label>
+                            <input type="number" id="stk-out-husk" placeholder="e.g. 3300">
+                        </div>
+                        <div class="field">
+                            <label>Coconut Water Obtained (Liters/Units Addition)</label>
+                            <input type="number" id="stk-out-water" placeholder="e.g. 500">
+                        </div>
+                        <div class="field full">
+                            <label>Batch Description / Notes</label>
+                            <input type="text" id="stk-desc" placeholder="e.g. Lot 4 drying processing run">
+                        </div>
+                    </div>
+                    <div class="form-actions">
+                        <button type="button" class="btn" onclick="saveProcessingBatch()">Log Production Batch</button>
+                    </div>
+                </div>
+
+                <h2 class="section-title">Stock Movement Log</h2>
+                <div class="table-wrap">
+                    <table>
+                        <thead>
+                            <tr>
+                                <th>Date</th>
+                                <th>Category Item</th>
+                                <th>Movement Type</th>
+                                <th style="text-align:right;">Quantity</th>
+                                <th style="text-align:right;">Avg Rate</th>
+                                <th>Associated Party / Notes</th>
+                            </tr>
+                        </thead>
+                        <tbody id="inventory-body"></tbody>
+                    </table>
+                </div>
             </div>
 
             <!-- TRADERS -->
@@ -650,8 +704,6 @@
                             <label id="trader-field-label">Trader / Labor</label>
                             <select id="f-trader"></select>
                         </div>
-
-                        <!-- NEW SETTLEMENT FLAGS IMPLEMENTATION -->
                         <div class="field">
                             <label>Payment Status</label>
                             <select id="f-status">
@@ -669,14 +721,10 @@
                                     <span>🧮 Use Quantity × Rate</span>
                                 </label>
                             </div>
-
-                            <!-- Flat Amount Input (Visible by default) -->
                             <input type="number" id="f-amount" step="any" placeholder="0.00" required style="width: 100%;">
-
-                            <!-- Dynamic Calculator Inputs (Hidden by default) -->
                             <div id="calc-fields" style="display: none; gap: 12px; margin-top: 8px;">
                                 <div style="flex: 1;">
-                                    <label style="font-size: 12px; color: #5B3A20; margin-bottom: 4px; display: block;">Quantity (Nos / Kgs / Tons)</label>
+                                    <label style="font-size: 12px; color: #5B3A20; margin-bottom: 4px; display: block;">Quantity (Units)</label>
                                     <input type="number" id="f-qty" step="any" placeholder="e.g. 2500" style="width: 100%;">
                                 </div>
                                 <div style="flex: 1;">
@@ -696,24 +744,39 @@
                     </div>
                 </div>
 
-                <!-- Filter & Export Controls Row -->
-                <div class="field" style="margin-bottom: 14px; display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 10px; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;">
+                <!-- Advanced Date Filters and Actions Row -->
+                <div style="background: var(--card); border: 1px solid var(--line); border-radius: 10px; padding: 14px; margin-bottom: 14px; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;">
+                    <div style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 12px;">
 
-                    <!-- Left Side: Filters -->
-                    <div style="display: flex; align-items: center; gap: 10px;">
-                        <div class="filter-toggle" style="display: flex; gap: 8px; flex: none; width: 300px;">
-                            <button type="button" class="filter-btn selected" data-filter="all">All</button>
-                            <button type="button" class="filter-btn" data-filter="in">Cash In</button>
-                            <button type="button" class="filter-btn" data-filter="out">Cash Out</button>
+                        <!-- Filter Block Left -->
+                        <div style="display: flex; flex-direction: column; gap: 8px; min-width: 320px;">
+                            <div style="display: flex; gap: 6px;" class="filter-toggle">
+                                <button type="button" class="filter-btn selected" data-filter="all">All Cash</button>
+                                <button type="button" class="filter-btn" data-filter="in">Cash In</button>
+                                <button type="button" class="filter-btn" data-filter="out">Cash Out</button>
+                            </div>
+
+                            <div style="display: flex; gap: 4px; flex-wrap: wrap;" class="date-filter-toggle">
+                                <button type="button" class="date-btn selected" data-date-range="all">All Dates</button>
+                                <button type="button" class="date-btn" data-date-range="today">Today</button>
+                                <button type="button" class="date-btn" data-date-range="month">This Month</button>
+                                <button type="button" class="date-btn" data-date-range="lastmonth">Last Month</button>
+                                <button type="button" class="date-btn" data-date-range="custom">Custom Range</button>
+                            </div>
+
+                            <div id="custom-date-container" style="display: none; align-items: center; gap: 6px; margin-top: 4px;">
+                                <input type="date" id="filter-start-date" style="padding: 6px; border: 1px solid var(--line); border-radius: 4px; font-size:12px;">
+                                <span style="font-size: 12px; color: var(--ink-soft);">to</span>
+                                <input type="date" id="filter-end-date" style="padding: 6px; border: 1px solid var(--line); border-radius: 4px; font-size:12px;">
+                            </div>
+                        </div>
+
+                        <!-- Action Block Right -->
+                        <div style="display: flex; gap: 8px;">
+                            <button type="button" class="btn secondary" style="padding: 8px 14px; font-size: 12.5px;" onclick="exportToWhatsApp()">📋 Copy for WhatsApp</button>
+                            <button type="button" class="btn secondary" style="padding: 8px 14px; font-size: 12.5px;" onclick="downloadCSV()">💾 Download CSV</button>
                         </div>
                     </div>
-
-                    <!-- Right Side: Exports -->
-                    <div style="display: flex; gap: 10px;">
-                        <button type="button" class="btn secondary" style="padding: 6px 14px; font-size: 12.5px;" onclick="exportToWhatsApp()">📋 Copy Summary for WhatsApp</button>
-                        <button type="button" class="btn secondary" style="padding: 6px 14px; font-size: 12.5px;" onclick="downloadCSV()">💾 Download Excel/CSV File</button>
-                    </div>
-
                 </div>
 
                 <div class="table-wrap">
@@ -773,7 +836,6 @@
         // ==========================================
         const SUPABASE_URL = 'https://ocnfbgubhqvyxidlsdir.supabase.co';
         const SUPABASE_ANON_KEY = 'sb_publishable_JmfXhemd49Ej1J_bST4dWg_r_BnOzX0';
-
         const STORAGE_KEY = 'coconut-cashbook-data';
 
         const supabaseClient = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
@@ -787,9 +849,7 @@
                         .select('state')
                         .eq('id', 'main')
                         .single();
-
                     if (error && error.code !== 'PGRST116') throw error;
-
                     if (data && data.state) {
                         if (note) note.textContent = 'Data synced from Cloud Database.';
                         return { value: JSON.stringify(data.state) };
@@ -806,12 +866,10 @@
                 try {
                     localStorage.setItem(key, value);
                     if (note) note.textContent = 'Syncing updates...';
-
                     const parsedState = JSON.parse(value);
                     const { error } = await supabaseClient
                         .from('app_state')
                         .upsert({ id: 'main', state: parsedState }, { onConflict: 'id' });
-
                     if (error) throw error;
                     if (note) note.textContent = 'All data is saved automatically to the cloud.';
                     return true;
@@ -824,7 +882,6 @@
         };
 
         const DRAFT_KEY = 'coconut-cashbook-draft';
-
         const CATEGORIES = {
             in: ["Coconut Sales", "Copra Sales", "Coconut Oil Sales", "Coconut Water Sales", "Husk/Shell Sales", "Advance Received", "Other Income"],
             out: ["Coconut Purchase", "Labor Wages", "Transport/Freight", "Loading/Unloading", "Storage/Rent", "Electricity/Fuel", "Packing Material", "Maintenance", "Commission/Brokerage", "Loan Repayment", "Other Expense"]
@@ -833,11 +890,11 @@
         let state = { openingBalance: 0, entries: [], traders: [], labor: [] };
         let currentType = 'in';
         let currentFilter = 'all';
+        let currentDateRange = 'all';
         let editingId = null;
         let traderEditingId = null;
         let laborEditingId = null;
 
-        // Custom Elegant Popup Helpers
         function showModal(message, isConfirm = false, title = "Notice") {
             return new Promise((resolve) => {
                 const modal = document.getElementById('custom-modal');
@@ -857,7 +914,6 @@
                     cancelBtn.onclick = null;
                     resolve(value);
                 }
-
                 okBtn.onclick = () => cleanup(true);
                 cancelBtn.onclick = () => cleanup(false);
             });
@@ -868,7 +924,6 @@
                 showModal("No entries found to generate a statement summary.", false, "Export Empty");
                 return;
             }
-
             let textStr = `*COCONUT CASH BOOK STATEMENT*\nGenerated: ${new Date().toLocaleDateString('en-IN')}\n\n`;
             textStr += `Opening Balance: ${fmt(state.openingBalance)}\n`;
 
@@ -888,9 +943,9 @@
             textStr += `\n\n*SUMMARY TOTALS*\n📥 Total Cash In: ${fmt(totalIn)}\n📤 Total Cash Out: ${fmt(totalOut)}\n💵 Current Cash Balance: ${fmt(state.openingBalance + totalIn - totalOut)}`;
 
             navigator.clipboard.writeText(textStr).then(() => {
-                showModal("Statement text formatted and copied to clipboard! You can now paste it directly into WhatsApp.", false, "Copied Successfully");
+                showModal("Statement text formatted and copied to clipboard!", false, "Copied Successfully");
             }).catch(() => {
-                showModal("Failed to auto-copy text. Please check browser privacy permissions.", false, "Copy Error");
+                showModal("Failed to auto-copy text.", false, "Copy Error");
             });
         }
 
@@ -899,8 +954,6 @@
                 showModal("No entries recorded yet to create a download spreadsheet file.", false, "Export Empty");
                 return;
             }
-
-            // Setup Headers CSV structural array row mapping
             let csvRows = [["Date", "Description", "Trader/Labor", "Category", "Payment Status", "Cash In", "Cash Out", "Running Balance", "Notes"]];
             const sorted = computeBalances();
 
@@ -933,8 +986,7 @@
             return '₹' + n.toLocaleString('en-IN');
         }
         function todayStr() {
-            const d = new Date();
-            return d.toISOString().slice(0, 10);
+            return new Date().toISOString().slice(0, 10);
         }
         function uid() {
             return 'e' + Date.now().toString(36) + Math.random().toString(36).slice(2, 7);
@@ -953,7 +1005,7 @@
                     type: currentType
                 };
                 localStorage.setItem(DRAFT_KEY, JSON.stringify(draft));
-            } catch (e) { /* ignore */ }
+            } catch (e) { }
         }
 
         function loadDraft() {
@@ -971,7 +1023,7 @@
                 if (draft.status) document.getElementById('f-status').value = draft.status;
                 if (draft.amount) document.getElementById('f-amount').value = draft.amount;
                 if (typeof draft.notes === 'string') document.getElementById('f-notes').value = draft.notes;
-            } catch (e) { /* ignore */ }
+            } catch (e) { }
         }
 
         function populateCategorySelect() {
@@ -1017,10 +1069,9 @@
             if (!body) return;
             body.innerHTML = '';
             if (!state.traders || state.traders.length === 0) {
-                body.innerHTML = '<tr><td colspan="4" class="empty-note" style="padding:18px;">No traders yet. Add one above.</td></tr>';
+                body.innerHTML = '<tr><td colspan="4" class="empty-note" style="padding:18px;">No traders yet.</td></tr>';
                 return;
             }
-
             const thead = body.closest('table').querySelector('thead tr');
             thead.innerHTML = '<th>Trader</th><th>Phone</th><th style="text-align:right;">Net Balance</th><th></th>';
 
@@ -1029,21 +1080,17 @@
                 const totalIn = tEntries.filter(e => e.type === 'in').reduce((sum, e) => sum + e.amount, 0);
                 const totalOut = tEntries.filter(e => e.type === 'out').reduce((sum, e) => sum + e.amount, 0);
                 const netBal = totalIn - totalOut;
-
-                // Dynamic Explicit Coloring
-                let balColor = '#2B2419'; // Default dark ink text for zero balance
-                if (netBal > 0) balColor = '#2e7d32'; // Clean Forest Green for positive balance
-                if (netBal < 0) balColor = '#c62828'; // Clear Crimson Red for negative balance
+                let balColor = netBal > 0 ? '#2e7d32' : (netBal < 0 ? '#c62828' : '#2B2419');
 
                 const tr = document.createElement('tr');
                 tr.innerHTML = `
-                <td>${escapeHtml(t.name)}</td>
-                <td>${escapeHtml(t.phone || '')}</td>
-                <td class="num" style="font-weight:700; color:${balColor}; text-align:right;">${fmt(netBal)}</td>
-                <td class="row-actions">
-                    <button class="edit-trader" data-id="${t.id}">Edit</button>
-                    <button class="del-trader" data-id="${t.id}">Delete</button>
-                </td>`;
+                                <td>${escapeHtml(t.name)}</td>
+                                <td>${escapeHtml(t.phone || '')}</td>
+                                <td class="num" style="font-weight:700; color:${balColor}; text-align:right;">${fmt(netBal)}</td>
+                                <td class="row-actions">
+                                    <button class="edit-trader" data-id="${t.id}">Edit</button>
+                                    <button class="del-trader" data-id="${t.id}">Delete</button>
+                                </td>`;
                 body.appendChild(tr);
             });
             body.querySelectorAll('.edit-trader').forEach(b => b.addEventListener('click', () => startEditTrader(b.dataset.id)));
@@ -1071,22 +1118,17 @@
         async function deleteTraderWithConfirm(id) {
             const t = state.traders.find(x => x.id === id);
             if (!t) return;
-            const refs = state.entries.filter(e => e.trader === id).length;
-            if (refs > 0) {
-                await showModal(`Trader "${t.name}" is referenced in cashbook entries and cannot be deleted.`, false, 'Cannot Delete');
+            if (state.entries.filter(e => e.trader === id).length > 0) {
+                await showModal(`Trader "${t.name}" is referenced and cannot be deleted.`, false, 'Cannot Delete');
                 return;
             }
-            const confirmed = await showModal(`Delete trader "${t.name}"?`, true, 'Confirm Deletion');
-            if (!confirmed) return;
-
+            if (!await showModal(`Delete trader "${t.name}"?`, true, 'Confirm Deletion')) return;
             state.traders = state.traders.filter(x => x.id !== id);
             await window.storage.set(STORAGE_KEY, JSON.stringify(state));
             renderTraders();
             populateTraderSelect();
             render();
         }
-
-        document.getElementById('trader-cancel').onclick = cancelEditTrader;
 
         // --- Labor Management ---
         async function addLabor() {
@@ -1121,10 +1163,9 @@
             if (!body) return;
             body.innerHTML = '';
             if (!state.labor || state.labor.length === 0) {
-                body.innerHTML = '<tr><td colspan="4" class="empty-note" style="padding:18px;">No labor records yet. Add one above.</td></tr>';
+                body.innerHTML = '<tr><td colspan="4" class="empty-note" style="padding:18px;">No labor records yet.</td></tr>';
                 return;
             }
-
             const thead = body.closest('table').querySelector('thead tr');
             thead.innerHTML = '<th>Worker Name</th><th>Phone</th><th style="text-align:right;">Net Paid / Owed</th><th></th>';
 
@@ -1133,21 +1174,17 @@
                 const totalIn = lEntries.filter(e => e.type === 'in').reduce((sum, e) => sum + e.amount, 0);
                 const totalOut = lEntries.filter(e => e.type === 'out').reduce((sum, e) => sum + e.amount, 0);
                 const netBal = totalOut - totalIn;
-
-                // Dynamic Explicit Coloring
-                let balColor = '#2B2419';
-                if (netBal > 0) balColor = '#2e7d32'; // Paid out wages / advance clear
-                if (netBal < 0) balColor = '#c62828'; // Owed to worker / pending settlement
+                let balColor = netBal > 0 ? '#2e7d32' : (netBal < 0 ? '#c62828' : '#2B2419');
 
                 const tr = document.createElement('tr');
                 tr.innerHTML = `
-                <td>${escapeHtml(l.name)}</td>
-                <td>${escapeHtml(l.phone || '')}</td>
-                <td class="num" style="font-weight:700; color:${balColor}; text-align:right;">${fmt(netBal)}</td>
-                <td class="row-actions">
-                    <button class="edit-labor" data-id="${l.id}">Edit</button>
-                    <button class="del-labor" data-id="${l.id}">Delete</button>
-                </td>`;
+                                <td>${escapeHtml(l.name)}</td>
+                                <td>${escapeHtml(l.phone || '')}</td>
+                                <td class="num" style="font-weight:700; color:${balColor}; text-align:right;">${fmt(netBal)}</td>
+                                <td class="row-actions">
+                                    <button class="edit-labor" data-id="${l.id}">Edit</button>
+                                    <button class="del-labor" data-id="${l.id}">Delete</button>
+                                </td>`;
                 body.appendChild(tr);
             });
             body.querySelectorAll('.edit-labor').forEach(b => b.addEventListener('click', () => startEditLabor(b.dataset.id)));
@@ -1175,14 +1212,11 @@
         async function deleteLaborWithConfirm(id) {
             const l = state.labor.find(x => x.id === id);
             if (!l) return;
-            const refs = state.entries.filter(e => e.trader === id).length;
-            if (refs > 0) {
-                await showModal(`Labor worker "${l.name}" is referenced in your cashbook and cannot be deleted.`, false, 'Cannot Delete');
+            if (state.entries.filter(e => e.trader === id).length > 0) {
+                await showModal(`Labor worker "${l.name}" is referenced and cannot be deleted.`, false, 'Cannot Delete');
                 return;
             }
-            const confirmed = await showModal(`Delete worker "${l.name}"?`, true, 'Confirm Deletion');
-            if (!confirmed) return;
-
+            if (!await showModal(`Delete worker "${l.name}"?`, true, 'Confirm Deletion')) return;
             state.labor = state.labor.filter(x => x.id !== id);
             await window.storage.set(STORAGE_KEY, JSON.stringify(state));
             renderLabor();
@@ -1190,9 +1224,6 @@
             render();
         }
 
-        document.getElementById('labor-cancel').onclick = cancelEditLabor;
-
-        // --- Dynamic Dropdown System ---
         function populateTraderSelect() {
             const sel = document.getElementById('f-trader');
             const labelEl = document.getElementById('trader-field-label');
@@ -1203,26 +1234,18 @@
             const none = document.createElement('option'); none.value = ''; none.textContent = '— none —';
             sel.appendChild(none);
 
-            // If category is Labor Wages, switch field options to Labor Workers
             if (categoryEl && categoryEl.value === "Labor Wages") {
                 if (labelEl) labelEl.textContent = "Labor Worker";
                 state.labor.forEach(l => {
-                    const opt = document.createElement('option');
-                    opt.value = l.id; opt.textContent = l.name + (l.phone ? (' — ' + l.phone) : '');
+                    const opt = document.createElement('option'); opt.value = l.id; opt.textContent = l.name + (l.phone ? (' — ' + l.phone) : '');
                     sel.appendChild(opt);
                 });
             } else {
                 if (labelEl) labelEl.textContent = "Trader";
                 state.traders.forEach(t => {
-                    const opt = document.createElement('option');
-                    opt.value = t.id; opt.textContent = t.name + (t.phone ? (' — ' + t.phone) : '');
+                    const opt = document.createElement('option'); opt.value = t.id; opt.textContent = t.name + (t.phone ? (' — ' + t.phone) : '');
                     sel.appendChild(opt);
                 });
-            }
-
-            // Check if only the default "— none —" option exists
-            if (sel.options.length <= 1) {
-                none.textContent = `— No ${categoryEl.value === "Labor Wages" ? "workers" : "traders"} available —`;
             }
         }
 
@@ -1247,13 +1270,234 @@
             });
         }
 
+        // --- NEW FUNCTION: Save Unified Processing Batch ---
+        async function saveProcessingBatch() {
+            const date = document.getElementById('stk-date').value;
+            const inputCoconuts = parseFloat(document.getElementById('stk-input-coconuts').value);
+            const outCopra = parseFloat(document.getElementById('stk-out-copra').value) || 0;
+            const outHusk = parseFloat(document.getElementById('stk-out-husk').value) || 0;
+            const outWater = parseFloat(document.getElementById('stk-out-water').value) || 0;
+            const description = document.getElementById('stk-desc').value.trim();
+
+            if (!date) {
+                await showModal('Please select an entry date.', false, 'Missing Date');
+                return;
+            }
+            if (isNaN(inputCoconuts) || inputCoconuts <= 0) {
+                await showModal('Please enter the number of raw coconuts used.', false, 'Invalid Input');
+                return;
+            }
+
+            if (!state.stockAdjustments) {
+                state.stockAdjustments = [];
+            }
+
+            // Generate a shared batch ID so the items stay grouped together
+            const batchId = 'batch-' + Date.now().toString(36);
+            const notes = description || `Batch processing run`;
+
+            // 1. Deduct the raw coconuts used
+            state.stockAdjustments.push({
+                id: uid(), batchId, date, commodity: 'Coconuts', direction: 'reduction', qty: inputCoconuts, description: `${notes} (Coconuts Used)`
+            });
+
+            // 2. Add Copra if produced
+            if (outCopra > 0) {
+                state.stockAdjustments.push({
+                    id: uid(), batchId, date, commodity: 'Copra', direction: 'addition', qty: outCopra, description: `${notes} (Copra Yield)`
+                });
+            }
+
+            // 3. Add Husk if produced
+            if (outHusk > 0) {
+                state.stockAdjustments.push({
+                    id: uid(), batchId, date, commodity: 'Husk/Shell', direction: 'addition', qty: outHusk, description: `${notes} (Husk Yield)`
+                });
+            }
+
+            // 4. Add Water if produced
+            if (outWater > 0) {
+                state.stockAdjustments.push({
+                    id: uid(), batchId, date, commodity: 'Water', direction: 'addition', qty: outWater, description: `${notes} (Water Yield)`
+                });
+            }
+
+            await window.storage.set(STORAGE_KEY, JSON.stringify(state));
+
+            // Clear input form fields
+            document.getElementById('stk-input-coconuts').value = '';
+            document.getElementById('stk-out-copra').value = '';
+            document.getElementById('stk-out-husk').value = '';
+            document.getElementById('stk-out-water').value = '';
+            document.getElementById('stk-desc').value = '';
+
+            renderInventoryLedger();
+        }
+
+        // --- NEW FUNCTION: Delete Entire Processing Batch ---
+        async function deleteProcessingBatch(batchId) {
+            if (!await showModal("Permanently remove all stock changes linked to this processing batch?", true, "Confirm Deletion")) return;
+            if (state.stockAdjustments) {
+                state.stockAdjustments = state.stockAdjustments.filter(adj => adj.batchId !== batchId);
+                await window.storage.set(STORAGE_KEY, JSON.stringify(state));
+                renderInventoryLedger();
+            }
+        }
+
+        // --- UPDATED INVENTORY LEDGER RENDERER ---
+        function renderInventoryLedger() {
+            const kpiContainer = document.getElementById('stock-kpis');
+            const body = document.getElementById('inventory-body');
+            if (!kpiContainer || !body) return;
+
+            if (!document.getElementById('stk-date').value) {
+                document.getElementById('stk-date').value = todayStr();
+            }
+
+            const inventoryTotals = {
+                "Coconuts": 0,
+                "Copra": 0,
+                "Oil": 0,
+                "Water": 0,
+                "Husk/Shell": 0
+            };
+
+            const stockMovements = [];
+
+            // 1. Process Cash Book Entries[cite: 7]
+            sortedEntries().forEach(e => {
+                if (!e.qty) return;
+
+                let commodity = "Coconuts";
+                if (e.category && e.category.includes("Copra")) commodity = "Copra";
+                else if (e.category && e.category.includes("Oil")) commodity = "Oil";
+                else if (e.category && e.category.includes("Water")) commodity = "Water";
+                else if (e.category && (e.category.includes("Husk") || e.category.includes("Shell"))) commodity = "Husk/Shell";
+
+                const isAddition = (e.type === 'out'); // Cash Out = Stock Purchase[cite: 7]
+                const directionText = isAddition ? "➕ Inbound Stock Purchase" : "➖ Outbound Stock Sale";
+
+                if (isAddition) {
+                    inventoryTotals[commodity] += e.qty;
+                } else {
+                    inventoryTotals[commodity] -= e.qty;
+                }
+
+                stockMovements.push({
+                    date: e.date,
+                    commodity: commodity,
+                    direction: directionText,
+                    qty: e.qty,
+                    rate: e.rate || 0,
+                    party: getTraderOrLaborName(e.trader) || 'Direct Transaction',
+                    isAdjustment: false
+                });
+            });
+
+            // 2. Process Batch Adjustments
+            if (state.stockAdjustments && Array.isArray(state.stockAdjustments)) {
+                state.stockAdjustments.forEach(adj => {
+                    const isAddition = (adj.direction === 'addition');
+                    const directionText = isAddition ? "➕ Production Add" : "➖ Processing Drop";
+
+                    if (isAddition) {
+                        inventoryTotals[adj.commodity] += adj.qty;
+                    } else {
+                        inventoryTotals[adj.commodity] -= adj.qty;
+                    }
+
+                    stockMovements.push({
+                        date: adj.date,
+                        commodity: adj.commodity,
+                        direction: directionText,
+                        qty: adj.qty,
+                        rate: 0,
+                        party: adj.description || 'Internal Processing Batch',
+                        isAdjustment: true,
+                        batchId: adj.batchId
+                    });
+                });
+            }
+
+            stockMovements.sort((a, b) => (a.date > b.date ? 1 : a.date < b.date ? -1 : 0));
+
+            // Render Balances
+            kpiContainer.innerHTML = Object.keys(inventoryTotals).map(item => `
+        <div class="kpi">
+            <div class="label">${item} Balance Stock</div>
+            <div class="value" style="color: var(--palm-dark); font-weight: bold;">${inventoryTotals[item].toLocaleString()} Units</div>
+        </div>
+    `).join('');
+
+            body.innerHTML = '';
+            if (stockMovements.length === 0) {
+                body.innerHTML = '<tr><td colspan="6" class="empty-note" style="padding:18px;">No stock logs found. Use the processing form to run transformations.</td></tr>';
+                return;
+            }
+
+            // Keep unique track of printed batch delete buttons per row
+            const renderedBatches = new Set();
+
+            stockMovements.reverse().forEach(sm => {
+                const tr = document.createElement('tr');
+
+                let actionMarkup = '';
+                if (sm.isAdjustment && sm.batchId && !renderedBatches.has(sm.batchId)) {
+                    actionMarkup = `<button onclick="deleteProcessingBatch('${sm.batchId}')" style="color:var(--rust-dark); background:none; border:none; cursor:pointer; font-size:11px; margin-left:8px; font-weight:bold;">❌ Delete Entire Batch</button>`;
+                    renderedBatches.add(sm.batchId);
+                }
+
+                tr.innerHTML = `
+            <td>${sm.date}</td>
+            <td><span class="cat-tag">${sm.commodity}</span></td>
+            <td style="font-weight: 600; color: ${sm.direction.includes('➕') ? 'var(--palm-dark)' : 'var(--rust-dark)'}">${sm.direction}</td>
+            <td class="num">${sm.qty.toLocaleString()}</td>
+            <td class="num">${sm.rate > 0 ? '₹' + sm.rate : '—'}</td>
+            <td>${escapeHtml(sm.party)} ${actionMarkup}</td>
+        `;
+                body.appendChild(tr);
+            });
+        }
+
+        // --- ADVANCED DATE FILTER SYSTEM ---
+        function matchDateRange(entryDate) {
+            if (currentDateRange === 'all') return true;
+
+            const targetDate = new Date(entryDate);
+            targetDate.setHours(0, 0, 0, 0);
+
+            const today = new Date();
+            today.setHours(0, 0, 0, 0);
+
+            if (currentDateRange === 'today') {
+                return targetDate.getTime() === today.getTime();
+            }
+            if (currentDateRange === 'month') {
+                return targetDate.getMonth() === today.getMonth() && targetDate.getFullYear() === today.getFullYear();
+            }
+            if (currentDateRange === 'lastmonth') {
+                const lastMonth = new Date(today.getFullYear(), today.getMonth() - 1, 1);
+                return targetDate.getMonth() === lastMonth.getMonth() && targetDate.getFullYear() === lastMonth.getFullYear();
+            }
+            if (currentDateRange === 'custom') {
+                const startInput = document.getElementById('filter-start-date').value;
+                const endInput = document.getElementById('filter-end-date').value;
+                if (!startInput || !endInput) return true; // fallback if dates unchosen
+
+                const start = new Date(startInput); start.setHours(0, 0, 0, 0);
+                const end = new Date(endInput); end.setHours(23, 59, 59, 999);
+                return targetDate >= start && targetDate <= end;
+            }
+            return true;
+        }
+
         function render() {
             renderCashBook();
             renderDashboard();
             renderSummary();
+            renderInventoryLedger();
         }
 
-        // Toggles status flag immediately on badge click without loading full edit form
         async function toggleStatusDirectly(id) {
             const entry = state.entries.find(e => e.id === id);
             if (!entry) return;
@@ -1267,41 +1511,36 @@
             body.innerHTML = '';
             const withBal = computeBalances();
 
-            // Filter the items based on user selection
             const filteredEntries = withBal.filter(e => {
-                if (currentFilter === 'all') return true;
-                return e.type === currentFilter;
+                const typeMatches = (currentFilter === 'all' || e.type === currentFilter);
+                const dateMatches = matchDateRange(e.date);
+                return typeMatches && dateMatches;
             });
 
             if (filteredEntries.length === 0) {
-                body.innerHTML = `<tr><td colspan="9" class="empty-note" style="padding:24px;">No transactions match the filter selection.</td></tr>`;
+                body.innerHTML = `<tr><td colspan="9" class="empty-note" style="padding:24px;">No transactions match the filter parameters.</td></tr>`;
                 return;
             }
 
             filteredEntries.forEach(e => {
                 const tr = document.createElement('tr');
                 const isPending = e.status === 'Pending';
-                if (isPending) {
-                    tr.classList.add('pending-row');
-                }
-
-                const statusText = isPending ? 'PENDING' : 'PAID';
-                const statusClass = isPending ? 'pending' : 'paid';
+                if (isPending) tr.classList.add('pending-row');
 
                 tr.innerHTML = `
-                        <td>${e.date}</td>
-                        <td>${escapeHtml(e.description || '')}</td>
-                        <td>${escapeHtml(getTraderOrLaborName(e.trader))}</td>
-                        <td><span class="cat-tag">${escapeHtml(e.category)}</span></td>
-                        <td><span class="status-badge ${statusClass}" onclick="toggleStatusDirectly('${e.id}')">${statusText}</span></td>
-                        <td class="num in">${e.type === 'in' ? fmt(e.amount) : ''}</td>
-                        <td class="num out">${e.type === 'out' ? fmt(e.amount) : ''}</td>
-                        <td class="num bal ${e.balance < 0 ? 'negative' : ''}">${fmt(e.balance)}</td>
-                        <td class="row-actions">
-                          <button data-copy="${e.id}">Copy</button>
-                          <button data-edit="${e.id}">Edit</button>
-                          <button data-del="${e.id}">Delete</button>
-                        </td>`;
+                                        <td>${e.date}</td>
+                                        <td>${escapeHtml(e.description || '')}</td>
+                                        <td>${escapeHtml(getTraderOrLaborName(e.trader))}</td>
+                                        <td><span class="cat-tag">${escapeHtml(e.category)}</span></td>
+                                        <td><span class="status-badge ${isPending ? 'pending' : 'paid'}" onclick="toggleStatusDirectly('${e.id}')">${isPending ? 'PENDING' : 'PAID'}</span></td>
+                                        <td class="num in">${e.type === 'in' ? fmt(e.amount) : ''}</td>
+                                        <td class="num out">${e.type === 'out' ? fmt(e.amount) : ''}</td>
+                                        <td class="num bal ${e.balance < 0 ? 'negative' : ''}">${fmt(e.balance)}</td>
+                                        <td class="row-actions">
+                                          <button data-copy="${e.id}">Copy</button>
+                                          <button data-edit="${e.id}">Edit</button>
+                                          <button data-del="${e.id}">Delete</button>
+                                        </td>`;
                 body.appendChild(tr);
             });
             body.querySelectorAll('[data-edit]').forEach(b => b.addEventListener('click', () => startEdit(b.dataset.edit)));
@@ -1312,28 +1551,19 @@
         function quickCopyEntry(id) {
             const e = state.entries.find(x => x.id === id);
             if (!e) return;
-
-            // Clear any active edit states first
             cancelEdit();
-
             currentType = e.type;
             document.querySelector('[data-view="cashbook"]').click();
-
             updateTypeButtons();
             populateCategorySelect();
             document.getElementById('f-category').value = e.category;
             populateTraderSelect();
-
-            // Fill the form fields (Keep date as today's date for quick entry)
             document.getElementById('f-date').value = todayStr();
             document.getElementById('f-desc').value = e.description || '';
             document.getElementById('f-status').value = e.status || 'Paid';
             document.getElementById('f-amount').value = e.amount;
             document.getElementById('f-notes').value = e.notes || '';
-            if (document.getElementById('f-trader')) {
-                document.getElementById('f-trader').value = e.trader || '';
-            }
-
+            if (document.getElementById('f-trader')) document.getElementById('f-trader').value = e.trader || '';
             saveDraft();
             window.scrollTo({ top: 0, behavior: 'smooth' });
         }
@@ -1343,12 +1573,6 @@
             d.textContent = s;
             return d.innerHTML;
         }
-
-        const traderSaveBtn = document.getElementById('trader-save');
-        if (traderSaveBtn) traderSaveBtn.onclick = addTrader;
-
-        const laborSaveBtn = document.getElementById('labor-save');
-        if (laborSaveBtn) laborSaveBtn.onclick = addLabor;
 
         function renderDashboard() {
             const withBal = computeBalances();
@@ -1369,7 +1593,7 @@
             list.innerHTML = '';
             const recent = [...withBal].reverse().slice(0, 6);
             if (recent.length === 0) {
-                list.innerHTML = '<li class="empty-note">No transactions logged yet. Go to the Cash Book tab to add one.</li>';
+                list.innerHTML = '<li class="empty-note">No transactions logged yet.</li>';
                 return;
             }
             recent.forEach(e => {
@@ -1377,11 +1601,11 @@
                 const relationshipName = getTraderOrLaborName(e.trader);
                 const pendingLabel = e.status === 'Pending' ? ' <span style="color:#d9534f; font-weight:bold; font-size:11px;">[CREDIT]</span>' : '';
                 li.innerHTML = `
-                      <div>
-                        <div class="desc">${escapeHtml(e.description || e.category)}${pendingLabel}</div>
-                        <div class="meta">${e.date} · ${escapeHtml(e.category)}${relationshipName ? (' · ' + escapeHtml(relationshipName)) : ''}</div>
-                      </div>
-                      <div class="amt ${e.type}">${e.type === 'in' ? '+' : '−'}${fmt(e.amount)}</div>`;
+                                      <div>
+                                        <div class="desc">${escapeHtml(e.description || e.category)}${pendingLabel}</div>
+                                        <div class="meta">${e.date} · ${escapeHtml(e.category)}${relationshipName ? (' · ' + escapeHtml(relationshipName)) : ''}</div>
+                                      </div>
+                                      <div class="amt ${e.type}">${e.type === 'in' ? '+' : '−'}${fmt(e.amount)}</div>`;
                 list.appendChild(li);
             });
         }
@@ -1397,7 +1621,7 @@
             const mbody = document.getElementById('monthly-body');
             mbody.innerHTML = '';
             if (months.length === 0) {
-                mbody.innerHTML = '<tr><td colspan="4" class="empty-note" style="padding:20px;">No data yet.</td></tr>';
+                mbody.innerHTML = '<tr><td colspan="4" class="empty-note">No data yet.</td></tr>';
             } else {
                 months.forEach(m => {
                     const { in: mi, out: mo } = monthMap[m];
@@ -1429,28 +1653,17 @@
             if (!e) return;
             editingId = id;
             currentType = e.type;
-
             document.querySelector('[data-view="cashbook"]').click();
-
             updateTypeButtons();
             populateCategorySelect();
-
-            // Explicitly enforce option selection AFTER DOM population
             document.getElementById('f-category').value = e.category;
-
-            // Dynamic execution to switch context between Trader and Labor Worker view
             populateTraderSelect();
-
             document.getElementById('f-date').value = e.date;
             document.getElementById('f-desc').value = e.description || '';
             document.getElementById('f-status').value = e.status || 'Paid';
             document.getElementById('f-amount').value = e.amount;
             document.getElementById('f-notes').value = e.notes || '';
-
-            // Ensure the drop-down matches the edited ledger record id
-            if (document.getElementById('f-trader')) {
-                document.getElementById('f-trader').value = e.trader || '';
-            }
+            if (document.getElementById('f-trader')) document.getElementById('f-trader').value = e.trader || '';
 
             if (e.qty || e.rate) {
                 document.getElementById('calc-toggle').checked = true;
@@ -1465,10 +1678,8 @@
                 document.getElementById('f-amount').readOnly = false;
                 document.getElementById('f-amount').style.background = '';
             }
-
             document.getElementById('save-entry').textContent = 'Save changes';
             document.getElementById('cancel-edit').style.display = 'inline-block';
-
             window.scrollTo({ top: 0, behavior: 'smooth' });
         }
 
@@ -1498,9 +1709,7 @@
         }
 
         async function deleteEntry(id) {
-            const confirmed = await showModal("Are you sure you want to permanently delete this cashbook entry?", true, "Confirm Deletion");
-            if (!confirmed) return;
-
+            if (!await showModal("Are you sure you want to permanently delete this cashbook entry?", true, "Confirm Deletion")) return;
             state.entries = state.entries.filter(e => e.id !== id);
             await window.storage.set(STORAGE_KEY, JSON.stringify(state));
             render();
@@ -1533,6 +1742,7 @@
 
                 if (btn.dataset.view === 'traders') renderTraders();
                 if (btn.dataset.view === 'labor') renderLabor();
+                if (btn.dataset.view === 'inventory') renderInventoryLedger();
                 if (btn.dataset.view === 'cashbook') populateTraderSelect();
             });
         });
@@ -1541,10 +1751,8 @@
             const dateInputEl = document.getElementById('f-date');
             const date = dateInputEl ? dateInputEl.value : '';
 
-            // --- MANDATORY DATE VALIDATION ---
             if (!date) {
                 await showModal('Please select a valid date for the entry.', false, 'Missing Date');
-                if (dateInputEl) dateInputEl.focus();
                 return;
             }
 
@@ -1558,16 +1766,12 @@
             const qty = isCalcActive ? parseFloat(document.getElementById('f-qty').value) || 0 : null;
             const rate = isCalcActive ? parseFloat(document.getElementById('f-rate').value) || 0 : null;
 
-            // 1. Validate Amount
             if (!amount || amount <= 0) {
                 await showModal('Enter an amount greater than 0.', false, 'Invalid Amount');
                 return;
             }
-
-            // 2. Validate that either Description OR Trader/Labor is provided
             if (!desc && !trader) {
-                const entityLabel = (category === "Labor Wages") ? "a labor worker" : "a trader";
-                await showModal(`Please provide either a Description or select ${entityLabel}.`, false, 'Missing Information');
+                await showModal(`Please provide either a Description or select a stakeholder party.`, false, 'Missing Information');
                 return;
             }
 
@@ -1583,8 +1787,7 @@
             } else {
                 state.entries.push({
                     id: uid(), _seq: state.entries.length,
-                    date, description: desc, category, type: currentType, status, amount, notes, trader, qty: qty,
-                    rate: rate
+                    date, description: desc, category, type: currentType, status, amount, notes, trader, qty, rate
                 });
             }
             await window.storage.set(STORAGE_KEY, JSON.stringify(state));
@@ -1601,43 +1804,56 @@
                 input.disabled = false;
                 input.focus();
                 btn.textContent = 'Save';
-                btn.dataset.mode = 'editing';
             } else {
                 const v = parseFloat(input.value);
                 state.openingBalance = isNaN(v) ? 0 : v;
                 input.disabled = true;
                 btn.textContent = 'Edit';
-                delete btn.dataset.mode;
                 await window.storage.set(STORAGE_KEY, JSON.stringify(state));
                 render();
             }
         });
 
-        // Replace your filter button click logic with this:
+        // Cash Flow Filter Toggles
         document.querySelectorAll('.filter-btn').forEach(btn => {
             btn.addEventListener('click', (e) => {
-                // Stop bubbling so it doesn't cross-contaminate form states
                 e.stopPropagation();
-
                 document.querySelectorAll('.filter-btn').forEach(b => b.classList.remove('selected'));
                 btn.classList.add('selected');
-
                 currentFilter = btn.dataset.filter;
                 renderCashBook();
             });
         });
 
-        // 1. Handle Toggle visibility for the calculator panel
+        // Advanced Custom Date Filtering Toggles
+        document.querySelectorAll('.date-btn').forEach(btn => {
+            btn.addEventListener('click', (e) => {
+                e.stopPropagation();
+                document.querySelectorAll('.date-btn').forEach(b => b.classList.remove('selected'));
+                btn.classList.add('selected');
+                currentDateRange = btn.dataset.date_range || btn.dataset.dateRange;
+
+                const customContainer = document.getElementById('custom-date-container');
+                if (currentDateRange === 'custom') {
+                    customContainer.style.display = 'flex';
+                } else {
+                    customContainer.style.display = 'none';
+                }
+                renderCashBook();
+            });
+        });
+
+        ['filter-start-date', 'filter-end-date'].forEach(id => {
+            document.getElementById(id).addEventListener('change', renderCashBook);
+        });
+
         document.getElementById('calc-toggle').addEventListener('change', function (e) {
             const calcFields = document.getElementById('calc-fields');
             const amountInput = document.getElementById('f-amount');
-
             if (e.target.checked) {
                 calcFields.style.display = 'flex';
-                amountInput.readOnly = true; // Prevent manual modification when calculator is active
-                amountInput.style.background = '#f4f1ea'; // Subtle look indicating it's computed
-
-                // Auto-suggest the last used rate for the active category
+                amountInput.readOnly = true;
+                amountInput.style.background = '#f4f1ea';
                 suggestLastRate();
             } else {
                 calcFields.style.display = 'none';
@@ -1648,38 +1864,27 @@
             }
         });
 
-        // 2. Perform live multiplication whenever Quantity or Rate changes
         ['f-qty', 'f-rate'].forEach(id => {
             document.getElementById(id).addEventListener('input', () => {
                 const qty = parseFloat(document.getElementById('f-qty').value) || 0;
                 const rate = parseFloat(document.getElementById('f-rate').value) || 0;
                 const total = qty * rate;
-
-                // Update the main amount field seamlessly
                 document.getElementById('f-amount').value = total > 0 ? total.toFixed(2) : '';
             });
         });
 
-        // 3. Track daily rate fluctuations by remembering the last custom value per category
         function suggestLastRate() {
             const currentCategory = document.getElementById('f-category').value;
             if (!currentCategory || !state.entries) return;
-
-            // Scan backwards to find the most recent entry with the same category and a recorded rate
-            const lastMatchingEntry = [...state.entries]
-                .reverse()
-                .find(e => e.category === currentCategory && e.rate);
-
+            const lastMatchingEntry = [...state.entries].reverse().find(e => e.category === currentCategory && e.rate);
             if (lastMatchingEntry) {
                 document.getElementById('f-rate').value = lastMatchingEntry.rate;
             }
         }
 
-        // 4. Update Category change listener to update the suggested rate if the calculator is currently open
         document.getElementById('f-category').addEventListener('change', () => {
             if (document.getElementById('calc-toggle').checked) {
                 suggestLastRate();
-                // Trigger calculation updates if quantities exist
                 const qty = parseFloat(document.getElementById('f-qty').value) || 0;
                 const rate = parseFloat(document.getElementById('f-rate').value) || 0;
                 document.getElementById('f-amount').value = (qty * rate) > 0 ? (qty * rate).toFixed(2) : '';
@@ -1700,15 +1905,13 @@
                     state.entries = Array.isArray(parsed.entries) ? parsed.entries : [];
                     state.traders = Array.isArray(parsed.traders) ? parsed.traders : [];
                     state.labor = Array.isArray(parsed.labor) ? parsed.labor : [];
-
+                    state.stockAdjustments = Array.isArray(parsed.stockAdjustments) ? parsed.stockAdjustments : [];
                     document.getElementById('opening-input').value = state.openingBalance;
                     renderTraders();
                     renderLabor();
                     render();
                 }
-            } catch (e) {
-                console.log("Local cache empty or unreadable");
-            }
+            } catch (e) { }
 
             try {
                 const res = await window.storage.get(STORAGE_KEY);
@@ -1718,15 +1921,13 @@
                     state.entries = Array.isArray(parsed.entries) ? parsed.entries : [];
                     state.traders = Array.isArray(parsed.traders) ? parsed.traders : [];
                     state.labor = Array.isArray(parsed.labor) ? parsed.labor : [];
-
+                    state.stockAdjustments = Array.isArray(parsed.stockAdjustments) ? parsed.stockAdjustments : [];
                     document.getElementById('opening-input').value = state.openingBalance;
                     renderTraders();
                     renderLabor();
                     render();
                 }
-            } catch (e) {
-                console.error("Cloud initialization error:", e);
-            }
+            } catch (e) { }
 
             const note = document.getElementById('save-note');
             if (note && note.textContent === 'Connecting to cloud database...') {
@@ -1734,24 +1935,17 @@
             }
 
             ['f-date', 'f-desc', 'f-category', 'f-status', 'f-amount', 'f-notes', 'f-trader'].forEach(id => {
-                const el = document.getElementById(id);
-                if (!el) return;
-                el.addEventListener('input', () => {
-                    saveDraft();
-                });
+                const el = document.getElementById(id); if (el) el.addEventListener('input', saveDraft);
             });
 
             setInterval(async () => {
                 try {
                     await window.storage.set(STORAGE_KEY, JSON.stringify(state));
                 } catch (e) {
-                    const note = document.getElementById('save-note');
-                    if (note) note.textContent = 'Sync delayed. Checking network connection...';
+                    const n = document.getElementById('save-note');
+                    if (n) n.textContent = 'Sync delayed. Checking network...';
                 }
             }, 10000);
-
-            const tbtn = document.getElementById('trader-save'); if (tbtn) tbtn.style.display = 'inline-block';
-            const lbtn = document.getElementById('labor-save'); if (lbtn) lbtn.style.display = 'inline-block';
         }
         init();
     </script>
