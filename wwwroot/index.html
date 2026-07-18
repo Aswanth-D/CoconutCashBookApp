@@ -718,13 +718,24 @@
                                 </label>
                             </div>
                             <input type="number" id="f-amount" step="any" placeholder="0.00" required style="width: 100%;">
-                            <div id="calc-fields" style="display: none; gap: 12px; margin-top: 8px;">
-                                <div style="flex: 1;">
-                                    <label style="font-size: 12px; color: #5B3A20; margin-bottom: 4px; display: block;">Quantity (Units)</label>
+                            <div id="calc-fields" style="display: none; flex-wrap: wrap; gap: 12px; margin-top: 8px;">
+                                <div style="flex: 1; min-width: 100px;">
+                                    <label style="font-size: 12px; color: #5B3A20; margin-bottom: 4px; display: block;">Unit Type</label>
+                                    <select id="f-unit" style="width: 100%; padding: 8px;">
+                                        <option value="Units">Units (Count)</option>
+                                        <option value="Ton">Ton (Weight)</option>
+                                    </select>
+                                </div>
+                                <div style="flex: 1; min-width: 100px;">
+                                    <label id="qty-field-label" style="font-size: 12px; color: #5B3A20; margin-bottom: 4px; display: block;">Quantity (Units)</label>
                                     <input type="number" id="f-qty" step="any" placeholder="e.g. 2500" style="width: 100%;">
                                 </div>
-                                <div style="flex: 1;">
-                                    <label style="font-size: 12px; color: #5B3A20; margin-bottom: 4px; display: block;">Rate per unit (₹)</label>
+                                <div id="conversion-box" style="flex: 1; min-width: 100px; display: none;">
+                                    <label style="font-size: 12px; color: #5B3A20; margin-bottom: 4px; display: block;">Approx Units / Ton</label>
+                                    <input type="number" id="f-conv" step="1" placeholder="e.g. 1000" style="width: 100%;">
+                                </div>
+                                <div style="flex: 1; min-width: 100px;">
+                                    <label id="rate-field-label" style="font-size: 12px; color: #5B3A20; margin-bottom: 4px; display: block;">Rate per unit (₹)</label>
                                     <input type="number" id="f-rate" step="any" placeholder="e.g. 15" style="width: 100%;">
                                 </div>
                             </div>
@@ -1469,9 +1480,11 @@
 
             const stockMovements = [];
 
-            // 1. Process Cash Book Entries[cite: 7]
+            // 1. Process Cash Book Entries
             sortedEntries().forEach(e => {
-                if (!e.qty) return;
+                // Determine the correct quantity for inventory tracking (calculated whole units if Ton, else standard qty)
+                const ledgerQty = e.stockQty !== undefined && e.stockQty !== null ? e.stockQty : (e.qty || 0);
+                if (ledgerQty <= 0) return;
 
                 let commodity = "Coconuts";
                 if (e.category && e.category.includes("Copra")) commodity = "Copra";
@@ -1479,22 +1492,27 @@
                 else if (e.category && e.category.includes("Water")) commodity = "Water";
                 else if (e.category && (e.category.includes("Husk") || e.category.includes("Shell"))) commodity = "Husk/Shell";
 
-                const isAddition = (e.type === 'out'); // Cash Out = Stock Purchase[cite: 7]
+                const isAddition = (e.type === 'out'); // Cash Out = Stock Purchase
                 const directionText = isAddition ? "➕ Inbound Stock Purchase" : "➖ Outbound Stock Sale";
 
                 if (isAddition) {
-                    inventoryTotals[commodity] += e.qty;
+                    inventoryTotals[commodity] += ledgerQty;
                 } else {
-                    inventoryTotals[commodity] -= e.qty;
+                    inventoryTotals[commodity] -= ledgerQty;
                 }
+
+                // If the entry used Ton calculations, format the log to display structural transparency
+                const displayNotes = e.unit === 'Ton'
+                    ? `${getTraderOrLaborName(e.trader) || 'Direct Transaction'} (${e.qty} Ton @ ₹${e.rate}/Ton)`
+                    : (getTraderOrLaborName(e.trader) || 'Direct Transaction');
 
                 stockMovements.push({
                     date: e.date,
                     commodity: commodity,
                     direction: directionText,
-                    qty: e.qty,
-                    rate: e.rate || 0,
-                    party: getTraderOrLaborName(e.trader) || 'Direct Transaction',
+                    qty: ledgerQty, // Strictly displays the calculated whole unit counts in the ledger view
+                    rate: e.unit === 'Ton' ? 0 : (e.rate || 0), // Prevents per-ton rate from appearing as a per-unit rate
+                    party: displayNotes,
                     isAdjustment: false
                 });
             });
@@ -1753,6 +1771,24 @@
             });
         }
 
+        function triggerUnitLabelUpdate() {
+            const currentUnit = document.getElementById('f-unit').value;
+            const convBox = document.getElementById('conversion-box');
+
+            if (currentUnit === 'Ton') {
+                document.getElementById('qty-field-label').textContent = 'Quantity (Tons)';
+                document.getElementById('rate-field-label').textContent = 'Rate per Ton (₹)';
+                convBox.style.display = 'block';
+            } else {
+                document.getElementById('qty-field-label').textContent = 'Quantity (Units)';
+                document.getElementById('rate-field-label').textContent = 'Rate per Unit (₹)';
+                convBox.style.display = 'none';
+                document.getElementById('f-conv').value = ''; // Clear conversion if switched back
+            }
+        }
+
+        document.getElementById('f-unit').addEventListener('change', triggerUnitLabelUpdate);
+
         function startEdit(id) {
             const e = state.entries.find(x => x.id === id);
             if (!e) return;
@@ -1775,8 +1811,11 @@
                 document.getElementById('calc-fields').style.display = 'flex';
                 document.getElementById('f-amount').readOnly = true;
                 document.getElementById('f-amount').style.background = '#f4f1ea';
+                document.getElementById('f-unit').value = e.unit || 'Units';
                 document.getElementById('f-qty').value = e.qty || '';
                 document.getElementById('f-rate').value = e.rate || '';
+                document.getElementById('f-conv').value = e.convFactor || '';
+                triggerUnitLabelUpdate();
             } else {
                 document.getElementById('calc-toggle').checked = false;
                 document.getElementById('calc-fields').style.display = 'none';
@@ -1868,8 +1907,18 @@
             const notes = document.getElementById('f-notes').value.trim();
             const trader = document.getElementById('f-trader').value || '';
             const isCalcActive = document.getElementById('calc-toggle').checked;
+
+            const unit = isCalcActive ? document.getElementById('f-unit').value : 'Units';
             const qty = isCalcActive ? parseFloat(document.getElementById('f-qty').value) || 0 : null;
             const rate = isCalcActive ? parseFloat(document.getElementById('f-rate').value) || 0 : null;
+            const convFactor = isCalcActive ? parseInt(document.getElementById('f-conv').value) || 0 : 0;
+
+            // Calculate Stock Quantity strictly in whole units for the ledger
+            let stockQty = qty;
+            if (isCalcActive && unit === 'Ton') {
+                // If tracked in tons, multiply by pieces-per-ton and round to closest whole piece
+                stockQty = convFactor > 0 ? Math.round(qty * convFactor) : 0;
+            }
 
             if (!amount || amount <= 0) {
                 await showModal('Enter an amount greater than 0.', false, 'Invalid Amount');
@@ -1885,14 +1934,12 @@
 
             if (editingId) {
                 const e = state.entries.find(x => x.id === editingId);
-                Object.assign(e, { date, description: desc, category, type: currentType, status, amount, notes, trader, qty, rate });
+                Object.assign(e, { date, description: desc, category, type: currentType, status, amount, notes, trader, qty, rate, unit, convFactor, stockQty });
                 editingId = null;
-                document.getElementById('save-entry').textContent = 'Add entry';
-                document.getElementById('cancel-edit').style.display = 'none';
             } else {
                 state.entries.push({
                     id: uid(), _seq: state.entries.length,
-                    date, description: desc, category, type: currentType, status, amount, notes, trader, qty, rate
+                    date, description: desc, category, type: currentType, status, amount, notes, trader, qty, rate, unit, convFactor, stockQty
                 });
             }
             await window.storage.set(STORAGE_KEY, JSON.stringify(state));
@@ -2039,7 +2086,7 @@
                 note.textContent = 'App ready. Syncing updates in background...';
             }
 
-            ['f-date', 'f-desc', 'f-category', 'f-status', 'f-amount', 'f-notes', 'f-trader'].forEach(id => {
+            ['f-date', 'f-desc', 'f-category', 'f-status', 'f-amount', 'f-notes', 'f-trader', 'f-unit'].forEach(id => {
                 const el = document.getElementById(id); if (el) el.addEventListener('input', saveDraft);
             });
 
