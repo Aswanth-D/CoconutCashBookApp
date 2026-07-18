@@ -50,7 +50,10 @@
 
     <ItemGroup>
         <!-- App Icon -->
-        <MauiIcon Include="Resources\AppIcon\appicon.svg" ForegroundFile="Resources\AppIcon\appiconfg.svg" Color="#512BD4" />
+		<MauiIcon Include="Resources\AppIcon\coconut.png" ForegroundFile="Resources\AppIcon\coconut.png">
+            <ForegroundScale>1.0</ForegroundScale>
+            <IsSimple>true</IsSimple>
+        </MauiIcon>
 
         <!-- Splash Screen -->
         <MauiSplashScreen Include="Resources\Splash\splash.svg" Color="#512BD4" BaseSize="128,128" />
