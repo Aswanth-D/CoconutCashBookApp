@@ -831,6 +831,27 @@
                         </table>
                     </div>
                 </div>
+
+                <!-- PROFITABILITY ANALYTICS ENGINE -->
+                <h2 class="section-title" style="margin-top: 26px;">📈 Profitability Analytics Engine</h2>
+                <div class="kpis" id="analytics-kpis" style="margin-bottom: 22px;">
+                    <!-- Rendered dynamically by JS -->
+                </div>
+                <div class="table-wrap" style="margin-bottom: 26px;">
+                    <table>
+                        <thead>
+                            <tr>
+                                <th>Commodity Stream</th>
+                                <th style="text-align:right;">Total Revenue (In)</th>
+                                <th style="text-align:right;">Production Costs (Out)</th>
+                                <th style="text-align:right;">Net Margin</th>
+                                <th style="text-align:right;">Profitability Index</th>
+                            </tr>
+                        </thead>
+                        <tbody id="analytics-body"></tbody>
+                    </table>
+                </div>
+
                 <!-- DANGER ZONE: RESET SYSTEM WITH SECURITY LOCK -->
                 <hr style="border: 0; border-top: 1px solid var(--line); margin: 40px 0 20px;">
                 <div style="background: #fff5f5; border: 1px solid #fabdbd; border-radius: 10px; padding: 20px; text-align: center; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;">
@@ -1769,6 +1790,92 @@
                 tr.innerHTML = `<td>${c}</td><td class="num">${fmt(total)}</td>`;
                 catOut.appendChild(tr);
             });
+
+            // --- PROFITABILITY ANALYTICS ENGINE LOGIC ---
+            const analyticsBody = document.getElementById('analytics-body');
+            const analyticsKpis = document.getElementById('analytics-kpis');
+
+            if (analyticsBody && analyticsKpis) {
+                const streams = {
+                    "Coconuts": { in: 0, out: 0 },
+                    "Copra": { in: 0, out: 0 },
+                    "Oil": { in: 0, out: 0 },
+                    "Husk/Shell": { in: 0, out: 0 },
+                    "Other/General": { in: 0, out: 0 }
+                };
+
+                let operationalExpenses = 0;
+                let totalIncomeFramework = 0;
+
+                // Allocate cash transactions across production channels
+                state.entries.forEach(e => {
+                    let assigned = false;
+                    const cat = e.category || '';
+
+                    // Route revenue and explicit product procurement
+                    Object.keys(streams).forEach(stream => {
+                        if (cat.includes(stream) || (stream === "Husk/Shell" && cat.includes("Husk"))) {
+                            streams[stream][e.type] += e.amount;
+                            assigned = true;
+                        }
+                    });
+
+                    // Route operational overhead structural elements
+                    if (!assigned) {
+                        if (e.type === 'out') {
+                            operationalExpenses += e.amount;
+                        } else {
+                            streams["Other/General"]['in'] += e.amount;
+                        }
+                    }
+
+                    if (e.type === 'in') totalIncomeFramework += e.amount;
+                });
+
+                // Compute and render table metrics
+                analyticsBody.innerHTML = '';
+                Object.keys(streams).forEach(stream => {
+                    const data = streams[stream];
+                    const netMargin = data.in - data.out;
+                    const totalCost = data.out;
+
+                    // Profitability Index = Revenue / Cost (or metric default baseline standard)
+                    const pi = totalCost > 0 ? (data.in / totalCost).toFixed(2) : (data.in > 0 ? '∞' : '0.00');
+                    const marginColor = netMargin >= 0 ? 'var(--palm-dark)' : 'var(--rust-dark)';
+
+                    const tr = document.createElement('tr');
+                    tr.innerHTML = `
+                        <td><span class="cat-tag">${stream}</span></td>
+                        <td class="num in">${fmt(data.in)}</td>
+                        <td class="num out">${fmt(data.out)}</td>
+                        <td class="num" style="font-weight:700; color:${marginColor}">${fmt(netMargin)}</td>
+                        <td class="num" style="font-weight:700; color:${pi > 1 || pi === '∞' ? 'var(--palm-dark)' : 'var(--ink)'}">${pi}x</td>
+                    `;
+                    analyticsBody.appendChild(tr);
+                });
+
+                // Render High-Level Operational KPI Cards
+                const totalDirectCost = Object.values(streams).reduce((acc, curr) => acc + curr.out, 0);
+                const netProductMargin = totalIncomeFramework - totalDirectCost - operationalExpenses;
+                const roiPercent = (totalDirectCost + operationalExpenses) > 0
+                    ? (((totalIncomeFramework) / (totalDirectCost + operationalExpenses)) * 100 - 100).toFixed(1)
+                    : '0.0';
+
+                analyticsKpis.innerHTML = `
+                    <div class="kpi">
+                        <div class="label">Indirect Overhead (Labor/Freight)</div>
+                        <div class="value" style="color: var(--rust-dark);">${fmt(operationalExpenses)}</div>
+                    </div>
+                    <div class="kpi">
+                        <div class="label">Net Enterprise Profit</div>
+                        <div class="value" style="color: ${netProductMargin >= 0 ? 'var(--palm-dark)' : 'var(--rust-dark)'}; font-weight: bold;">${fmt(netProductMargin)}</div>
+                    </div>
+                    <div class="kpi">
+                        <div class="label">Return on Capital Invested</div>
+                        <div class="value" style="color: var(--husk-dark); font-weight: bold;">${roiPercent}%</div>
+                    </div>
+                `;
+            }
         }
 
         function triggerUnitLabelUpdate() {
@@ -1913,11 +2020,18 @@
             const rate = isCalcActive ? parseFloat(document.getElementById('f-rate').value) || 0 : null;
             const convFactor = isCalcActive ? parseInt(document.getElementById('f-conv').value) || 0 : 0;
 
-            // Calculate Stock Quantity strictly in whole units for the ledger
-            let stockQty = qty;
-            if (isCalcActive && unit === 'Ton') {
-                // If tracked in tons, multiply by pieces-per-ton and round to closest whole piece
-                stockQty = convFactor > 0 ? Math.round(qty * convFactor) : 0;
+            // --- FIXED: Calculate Stock Quantity strictly for ledger inventory balance routing ---
+            let stockQty = 0;
+            if (isCalcActive && qty > 0) {
+                if (unit === 'Ton') {
+                    stockQty = convFactor > 0 ? Math.round(qty * convFactor) : 0;
+                } else {
+                    stockQty = Math.round(qty);
+                }
+            } else if (!isCalcActive) {
+                // If calculator is off, check if description contains an inline number as fallback
+                const inlineMatches = desc.match(/\b\d+\b/);
+                if (inlineMatches) stockQty = parseInt(inlineMatches[0], 10);
             }
 
             if (!amount || amount <= 0) {
@@ -1926,6 +2040,12 @@
             }
             if (!desc && !trader) {
                 await showModal(`Please provide either a Description or select a stakeholder party.`, false, 'Missing Information');
+                return;
+            }
+
+            // If using the calculator, force a structural block warning if quantity was left zero
+            if (isCalcActive && stockQty <= 0) {
+                await showModal('Please specify a valid quantity greater than 0 to correctly update the Stock Ledger.', false, 'Invalid Quantity');
                 return;
             }
 
