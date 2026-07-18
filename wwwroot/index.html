@@ -604,8 +604,8 @@
                             </div>
                         </div>
                         <div class="field">
-                            <label>Date</label>
-                            <input type="date" id="f-date">
+                            <label>Date <span style="color: var(--rust-dark); font-weight: bold;">*</span></label>
+                            <input type="date" id="f-date" required>
                         </div>
                         <div class="field full">
                             <label>Description</label>
@@ -1470,7 +1470,16 @@
         });
 
         document.getElementById('save-entry').addEventListener('click', async () => {
-            const date = document.getElementById('f-date').value || todayStr();
+            const dateInputEl = document.getElementById('f-date');
+            const date = dateInputEl ? dateInputEl.value : '';
+
+            // --- MANDATORY DATE VALIDATION ---
+            if (!date) {
+                await showModal('Please select a valid date for the entry.', false, 'Missing Date');
+                if (dateInputEl) dateInputEl.focus();
+                return;
+            }
+
             const desc = document.getElementById('f-desc').value.trim();
             const category = document.getElementById('f-category').value;
             const amount = parseFloat(document.getElementById('f-amount').value);
