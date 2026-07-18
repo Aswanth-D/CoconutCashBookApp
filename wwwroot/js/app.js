@@ -152,36 +152,6 @@
             });
         }
 
-        function exportToWhatsApp() {
-            if (state.entries.length === 0) {
-                showModal("No entries found to generate a statement summary.", false, "Export Empty");
-                return;
-            }
-            let textStr = `*COCONUT CASH BOOK STATEMENT*\nGenerated: ${new Date().toLocaleDateString('en-IN')}\n\n`;
-            textStr += `Opening Balance: ${fmt(state.openingBalance)}\n`;
-
-            const sorted = sortedEntries();
-            let dynamicRunning = state.openingBalance;
-
-            sorted.forEach(e => {
-                dynamicRunning += (e.type === 'in' ? e.amount : -e.amount);
-                const entityName = getTraderOrLaborName(e.trader);
-                const entityInfo = entityName ? ` (${entityName})` : '';
-                const payStatus = e.status === 'Pending' ? ' [PENDING]' : ' [PAID]';
-                textStr += `\n📅 ${e.date}\n📝 ${e.description || e.category}${entityInfo}${payStatus}\n💰 ${e.type === 'in' ? '+' : '–'}${fmt(e.amount)} | Bal: ${fmt(dynamicRunning)}\n---`;
-            });
-
-            const totalIn = state.entries.filter(e => e.type === 'in').reduce((s, e) => s + e.amount, 0);
-            const totalOut = state.entries.filter(e => e.type === 'out').reduce((s, e) => s + e.amount, 0);
-            textStr += `\n\n*SUMMARY TOTALS*\n📥 Total Cash In: ${fmt(totalIn)}\n📤 Total Cash Out: ${fmt(totalOut)}\n💵 Current Cash Balance: ${fmt(state.openingBalance + totalIn - totalOut)}`;
-
-            navigator.clipboard.writeText(textStr).then(() => {
-                showModal("Statement text formatted and copied to clipboard!", false, "Copied Successfully");
-            }).catch(() => {
-                showModal("Failed to auto-copy text.", false, "Copy Error");
-            });
-        }
-
         function downloadCSV() {
             if (state.entries.length === 0) {
                 showModal("No entries recorded yet to create a download spreadsheet file.", false, "Export Empty");
