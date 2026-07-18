@@ -583,10 +583,6 @@
                             <label>Husk/Shell Produced (Units Addition)</label>
                             <input type="number" id="stk-out-husk" placeholder="e.g. 3300">
                         </div>
-                        <div class="field">
-                            <label>Coconut Water Obtained (Liters/Units Addition)</label>
-                            <input type="number" id="stk-out-water" placeholder="e.g. 500">
-                        </div>
                         <div class="field full">
                             <label>Batch Description / Notes</label>
                             <input type="text" id="stk-desc" placeholder="e.g. Lot 4 drying processing run">
@@ -824,6 +820,29 @@
                         </table>
                     </div>
                 </div>
+                <!-- DANGER ZONE: RESET SYSTEM WITH SECURITY LOCK -->
+                <hr style="border: 0; border-top: 1px solid var(--line); margin: 40px 0 20px;">
+                <div style="background: #fff5f5; border: 1px solid #fabdbd; border-radius: 10px; padding: 20px; text-align: center; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;">
+                    <h3 style="margin: 0 0 6px; color: var(--rust-dark); font-size: 16px;">Danger Zone</h3>
+                    <p style="margin: 0 0 14px; color: var(--ink-soft); font-size: 13px;">
+                        This will permanently erase all cashbook transactions, labor logs, traders, and stock history from the cloud and this browser.
+                    </p>
+
+                    <!-- Security Text Lock -->
+                    <div style="margin-bottom: 14px;">
+                        <label style="display: block; font-size: 12px; font-weight: bold; color: var(--rust-dark); margin-bottom: 6px;">
+                            Type <span style="background:#ffe3e3; padding: 2px 6px; border-radius:4px;">RESET</span> below to unlock the purge button:
+                        </label>
+                        <input type="text" id="purge-lock-input" oninput="checkPurgeLock()" placeholder="Type RESET here"
+                               style="width: 100%; max-width: 240px; text-align: center; border: 1px solid #fabdbd; border-radius: 6px; padding: 6px; font-weight: bold; uppercase;">
+                    </div>
+
+                    <button type="button" id="purge-data-btn" class="btn" disabled
+                            style="background: #cbd5e1; border-color: #94a3b8; color: #64748b; cursor: not-allowed;"
+                            onclick="completelyResetAllData()">
+                        Wipe All Data
+                    </button>
+                </div>
             </div>
 
             <p class="save-note" id="save-note">Connecting to cloud database...</p>
@@ -894,6 +913,102 @@
         let editingId = null;
         let traderEditingId = null;
         let laborEditingId = null;
+
+        // Monitor the input field to unlock the delete button
+        function checkPurgeLock() {
+            const inputVal = document.getElementById('purge-lock-input').value.trim();
+            const btn = document.getElementById('purge-data-btn');
+
+            if (inputVal === "RESET") {
+                // Unlock button and apply original danger theme styles
+                btn.removeAttribute('disabled');
+                btn.style.background = 'var(--rust)';
+                btn.style.borderColor = 'var(--rust-dark)';
+                btn.style.color = '#ffffff';
+                btn.style.cursor = 'pointer';
+            } else {
+                // Lock button back down if it doesn't match perfectly
+                btn.setAttribute('disabled', 'true');
+                btn.style.background = '#cbd5e1';
+                btn.style.borderColor = '#94a3b8';
+                btn.style.color = '#64748b';
+                btn.style.cursor = 'not-allowed';
+            }
+        }
+
+        // --- DANGEROUS: WIPE EVERYTHING FROM LOCAL & CLOUD STORAGE ---
+        async function completelyResetAllData() {
+            // First warning
+            const firstConfirm = await showModal(
+                "Are you absolutely sure you want to delete ALL data? This cannot be undone.",
+                true,
+                "⚠️ Warning: Critical Action"
+            );
+            if (!firstConfirm) return;
+
+            // Second security warning
+            const secondConfirm = await showModal(
+                "Final Confirmation: This will clear your entire Cash Book, Traders database, Labor logs, and Stock ledger permanently. Proceed?",
+                true,
+                "🚨 Final Warning"
+            );
+            if (!secondConfirm) return;
+
+            // 1. Reset the local state object back to factory defaults
+            state = {
+                openingBalance: 0,
+                entries: [],
+                traders: [],
+                labor: [],
+                stockAdjustments: []
+            };
+
+            // 2. Clear out the persistent local cache
+            try {
+                localStorage.removeItem(STORAGE_KEY);
+                localStorage.removeItem(DRAFT_KEY);
+            } catch (e) { console.error("Error clearing localStorage:", e); }
+
+            // 3. Update the remote cloud database with the empty state
+            const note = document.getElementById('save-note');
+            if (note) note.textContent = 'Purging remote system...';
+
+            try {
+                const { error } = await supabaseClient
+                    .from('app_state')
+                    .upsert({ id: 'main', state: state }, { onConflict: 'id' });
+
+                if (error) throw error;
+                if (note) note.textContent = 'All records successfully wiped from cloud.';
+            } catch (e) {
+                console.error("Database cloud purge failed:", e);
+                if (note) note.textContent = 'Wiped locally, cloud sync pending connection.';
+            }
+
+            // 4. Force UI refresh across all view modules to reflect the zeroed-out state
+            document.getElementById('opening-input').value = 0;
+
+            // Clear processing fields if any text remains
+            if (document.getElementById('stk-input-coconuts')) {
+                document.getElementById('stk-input-coconuts').value = '';
+                document.getElementById('stk-out-copra').value = '';
+                document.getElementById('stk-out-husk').value = '';
+                document.getElementById('stk-desc').value = '';
+            }
+
+            // Re-render empty elements
+            renderTraders();
+            renderLabor();
+            render();
+
+            // Jump user safely back to the dashboard view
+            document.querySelector('[data-view="dashboard"]').click();
+
+            await showModal("System successfully reset to factory defaults.", false, "System Wiped");
+
+            document.getElementById('purge-lock-input').value = '';
+            checkPurgeLock();
+        }
 
         function showModal(message, isConfirm = false, title = "Notice") {
             return new Promise((resolve) => {
@@ -1084,13 +1199,13 @@
 
                 const tr = document.createElement('tr');
                 tr.innerHTML = `
-                                <td>${escapeHtml(t.name)}</td>
-                                <td>${escapeHtml(t.phone || '')}</td>
-                                <td class="num" style="font-weight:700; color:${balColor}; text-align:right;">${fmt(netBal)}</td>
-                                <td class="row-actions">
-                                    <button class="edit-trader" data-id="${t.id}">Edit</button>
-                                    <button class="del-trader" data-id="${t.id}">Delete</button>
-                                </td>`;
+                                        <td>${escapeHtml(t.name)}</td>
+                                        <td>${escapeHtml(t.phone || '')}</td>
+                                        <td class="num" style="font-weight:700; color:${balColor}; text-align:right;">${fmt(netBal)}</td>
+                                        <td class="row-actions">
+                                            <button class="edit-trader" data-id="${t.id}">Edit</button>
+                                            <button class="del-trader" data-id="${t.id}">Delete</button>
+                                        </td>`;
                 body.appendChild(tr);
             });
             body.querySelectorAll('.edit-trader').forEach(b => b.addEventListener('click', () => startEditTrader(b.dataset.id)));
@@ -1178,13 +1293,13 @@
 
                 const tr = document.createElement('tr');
                 tr.innerHTML = `
-                                <td>${escapeHtml(l.name)}</td>
-                                <td>${escapeHtml(l.phone || '')}</td>
-                                <td class="num" style="font-weight:700; color:${balColor}; text-align:right;">${fmt(netBal)}</td>
-                                <td class="row-actions">
-                                    <button class="edit-labor" data-id="${l.id}">Edit</button>
-                                    <button class="del-labor" data-id="${l.id}">Delete</button>
-                                </td>`;
+                                        <td>${escapeHtml(l.name)}</td>
+                                        <td>${escapeHtml(l.phone || '')}</td>
+                                        <td class="num" style="font-weight:700; color:${balColor}; text-align:right;">${fmt(netBal)}</td>
+                                        <td class="row-actions">
+                                            <button class="edit-labor" data-id="${l.id}">Edit</button>
+                                            <button class="del-labor" data-id="${l.id}">Delete</button>
+                                        </td>`;
                 body.appendChild(tr);
             });
             body.querySelectorAll('.edit-labor').forEach(b => b.addEventListener('click', () => startEditLabor(b.dataset.id)));
@@ -1276,7 +1391,6 @@
             const inputCoconuts = parseFloat(document.getElementById('stk-input-coconuts').value);
             const outCopra = parseFloat(document.getElementById('stk-out-copra').value) || 0;
             const outHusk = parseFloat(document.getElementById('stk-out-husk').value) || 0;
-            const outWater = parseFloat(document.getElementById('stk-out-water').value) || 0;
             const description = document.getElementById('stk-desc').value.trim();
 
             if (!date) {
@@ -1315,20 +1429,12 @@
                 });
             }
 
-            // 4. Add Water if produced
-            if (outWater > 0) {
-                state.stockAdjustments.push({
-                    id: uid(), batchId, date, commodity: 'Water', direction: 'addition', qty: outWater, description: `${notes} (Water Yield)`
-                });
-            }
-
             await window.storage.set(STORAGE_KEY, JSON.stringify(state));
 
             // Clear input form fields
             document.getElementById('stk-input-coconuts').value = '';
             document.getElementById('stk-out-copra').value = '';
             document.getElementById('stk-out-husk').value = '';
-            document.getElementById('stk-out-water').value = '';
             document.getElementById('stk-desc').value = '';
 
             renderInventoryLedger();
@@ -1357,9 +1463,8 @@
             const inventoryTotals = {
                 "Coconuts": 0,
                 "Copra": 0,
-                "Oil": 0,
-                "Water": 0,
-                "Husk/Shell": 0
+                "Husk/Shell": 0,
+                "Oil": 0
             };
 
             const stockMovements = [];
@@ -1423,11 +1528,11 @@
 
             // Render Balances
             kpiContainer.innerHTML = Object.keys(inventoryTotals).map(item => `
-        <div class="kpi">
-            <div class="label">${item} Balance Stock</div>
-            <div class="value" style="color: var(--palm-dark); font-weight: bold;">${inventoryTotals[item].toLocaleString()} Units</div>
-        </div>
-    `).join('');
+                <div class="kpi">
+                    <div class="label">${item} Balance Stock</div>
+                    <div class="value" style="color: var(--palm-dark); font-weight: bold;">${inventoryTotals[item].toLocaleString()} Units</div>
+                </div>
+            `).join('');
 
             body.innerHTML = '';
             if (stockMovements.length === 0) {
@@ -1448,13 +1553,13 @@
                 }
 
                 tr.innerHTML = `
-            <td>${sm.date}</td>
-            <td><span class="cat-tag">${sm.commodity}</span></td>
-            <td style="font-weight: 600; color: ${sm.direction.includes('➕') ? 'var(--palm-dark)' : 'var(--rust-dark)'}">${sm.direction}</td>
-            <td class="num">${sm.qty.toLocaleString()}</td>
-            <td class="num">${sm.rate > 0 ? '₹' + sm.rate : '—'}</td>
-            <td>${escapeHtml(sm.party)} ${actionMarkup}</td>
-        `;
+                    <td>${sm.date}</td>
+                    <td><span class="cat-tag">${sm.commodity}</span></td>
+                    <td style="font-weight: 600; color: ${sm.direction.includes('➕') ? 'var(--palm-dark)' : 'var(--rust-dark)'}">${sm.direction}</td>
+                    <td class="num">${sm.qty.toLocaleString()}</td>
+                    <td class="num">${sm.rate > 0 ? '₹' + sm.rate : '—'}</td>
+                    <td>${escapeHtml(sm.party)} ${actionMarkup}</td>
+                `;
                 body.appendChild(tr);
             });
         }
@@ -1528,19 +1633,19 @@
                 if (isPending) tr.classList.add('pending-row');
 
                 tr.innerHTML = `
-                                        <td>${e.date}</td>
-                                        <td>${escapeHtml(e.description || '')}</td>
-                                        <td>${escapeHtml(getTraderOrLaborName(e.trader))}</td>
-                                        <td><span class="cat-tag">${escapeHtml(e.category)}</span></td>
-                                        <td><span class="status-badge ${isPending ? 'pending' : 'paid'}" onclick="toggleStatusDirectly('${e.id}')">${isPending ? 'PENDING' : 'PAID'}</span></td>
-                                        <td class="num in">${e.type === 'in' ? fmt(e.amount) : ''}</td>
-                                        <td class="num out">${e.type === 'out' ? fmt(e.amount) : ''}</td>
-                                        <td class="num bal ${e.balance < 0 ? 'negative' : ''}">${fmt(e.balance)}</td>
-                                        <td class="row-actions">
-                                          <button data-copy="${e.id}">Copy</button>
-                                          <button data-edit="${e.id}">Edit</button>
-                                          <button data-del="${e.id}">Delete</button>
-                                        </td>`;
+                                                <td>${e.date}</td>
+                                                <td>${escapeHtml(e.description || '')}</td>
+                                                <td>${escapeHtml(getTraderOrLaborName(e.trader))}</td>
+                                                <td><span class="cat-tag">${escapeHtml(e.category)}</span></td>
+                                                <td><span class="status-badge ${isPending ? 'pending' : 'paid'}" onclick="toggleStatusDirectly('${e.id}')">${isPending ? 'PENDING' : 'PAID'}</span></td>
+                                                <td class="num in">${e.type === 'in' ? fmt(e.amount) : ''}</td>
+                                                <td class="num out">${e.type === 'out' ? fmt(e.amount) : ''}</td>
+                                                <td class="num bal ${e.balance < 0 ? 'negative' : ''}">${fmt(e.balance)}</td>
+                                                <td class="row-actions">
+                                                  <button data-copy="${e.id}">Copy</button>
+                                                  <button data-edit="${e.id}">Edit</button>
+                                                  <button data-del="${e.id}">Delete</button>
+                                                </td>`;
                 body.appendChild(tr);
             });
             body.querySelectorAll('[data-edit]').forEach(b => b.addEventListener('click', () => startEdit(b.dataset.edit)));
@@ -1601,11 +1706,11 @@
                 const relationshipName = getTraderOrLaborName(e.trader);
                 const pendingLabel = e.status === 'Pending' ? ' <span style="color:#d9534f; font-weight:bold; font-size:11px;">[CREDIT]</span>' : '';
                 li.innerHTML = `
-                                      <div>
-                                        <div class="desc">${escapeHtml(e.description || e.category)}${pendingLabel}</div>
-                                        <div class="meta">${e.date} · ${escapeHtml(e.category)}${relationshipName ? (' · ' + escapeHtml(relationshipName)) : ''}</div>
-                                      </div>
-                                      <div class="amt ${e.type}">${e.type === 'in' ? '+' : '−'}${fmt(e.amount)}</div>`;
+                                              <div>
+                                                <div class="desc">${escapeHtml(e.description || e.category)}${pendingLabel}</div>
+                                                <div class="meta">${e.date} · ${escapeHtml(e.category)}${relationshipName ? (' · ' + escapeHtml(relationshipName)) : ''}</div>
+                                              </div>
+                                              <div class="amt ${e.type}">${e.type === 'in' ? '+' : '−'}${fmt(e.amount)}</div>`;
                 list.appendChild(li);
             });
         }
