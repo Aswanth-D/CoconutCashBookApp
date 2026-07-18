@@ -50,19 +50,19 @@
             position: relative;
         }
 
-        header h1 {
-            margin: 0 0 4px;
-            font-size: 26px;
-            font-weight: normal;
-            letter-spacing: 0.3px;
-        }
+            header h1 {
+                margin: 0 0 4px;
+                font-size: 26px;
+                font-weight: normal;
+                letter-spacing: 0.3px;
+            }
 
-        header p {
-            margin: 0 0 18px;
-            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
-            font-size: 12.5px;
-            color: #D8C9B3;
-        }
+            header p {
+                margin: 0 0 18px;
+                font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+                font-size: 12.5px;
+                color: #D8C9B3;
+            }
 
         /* Tab navigation styled as ledger binder tabs */
         nav {
@@ -385,6 +385,37 @@
             color: var(--ink-soft);
         }
 
+        .status-badge {
+            display: inline-block;
+            font-size: 11px;
+            padding: 2px 6px;
+            border-radius: 4px;
+            font-weight: bold;
+            cursor: pointer;
+            user-select: none;
+            text-align: center;
+        }
+
+            .status-badge.paid {
+                background: #d4edda;
+                color: #155724;
+                border: 1px solid #c3e6cb;
+            }
+
+            .status-badge.pending {
+                background: #fcd1d1;
+                color: #a94442;
+                border: 1px solid #f5c6cb;
+            }
+
+        tbody tr.pending-row {
+            background: #fff8f8;
+        }
+
+            tbody tr.pending-row:nth-child(even) {
+                background: #fdf2f2;
+            }
+
         .row-actions {
             white-space: nowrap;
         }
@@ -482,11 +513,11 @@
             color: var(--ink-soft);
         }
 
-        .filter-toggle button.selected {
-            background: var(--husk);
-            color: #fff;
-            border-color: var(--husk-dark);
-        }
+            .filter-toggle button.selected {
+                background: var(--husk);
+                color: #fff;
+                border-color: var(--husk-dark);
+            }
     </style>
 </head>
 <body>
@@ -619,6 +650,16 @@
                             <label id="trader-field-label">Trader / Labor</label>
                             <select id="f-trader"></select>
                         </div>
+
+                        <!-- NEW SETTLEMENT FLAGS IMPLEMENTATION -->
+                        <div class="field">
+                            <label>Payment Status</label>
+                            <select id="f-status">
+                                <option value="Paid" selected>Paid / Settled</option>
+                                <option value="Pending">Pending / Credit</option>
+                            </select>
+                        </div>
+
                         <!-- Amount & Calculator Block -->
                         <div class="field" style="font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;">
                             <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 6px;">
@@ -683,6 +724,7 @@
                                 <th>Description</th>
                                 <th>Trader / Labor</th>
                                 <th>Category</th>
+                                <th>Status</th>
                                 <th style="text-align:right;">In</th>
                                 <th style="text-align:right;">Out</th>
                                 <th style="text-align:right;">Balance</th>
@@ -837,7 +879,8 @@
                 dynamicRunning += (e.type === 'in' ? e.amount : -e.amount);
                 const entityName = getTraderOrLaborName(e.trader);
                 const entityInfo = entityName ? ` (${entityName})` : '';
-                textStr += `\n📅 ${e.date}\n📝 ${e.description || e.category}${entityInfo}\n💰 ${e.type === 'in' ? '+' : '–'}${fmt(e.amount)} | Bal: ${fmt(dynamicRunning)}\n---`;
+                const payStatus = e.status === 'Pending' ? ' [PENDING]' : ' [PAID]';
+                textStr += `\n📅 ${e.date}\n📝 ${e.description || e.category}${entityInfo}${payStatus}\n💰 ${e.type === 'in' ? '+' : '–'}${fmt(e.amount)} | Bal: ${fmt(dynamicRunning)}\n---`;
             });
 
             const totalIn = state.entries.filter(e => e.type === 'in').reduce((s, e) => s + e.amount, 0);
@@ -858,7 +901,7 @@
             }
 
             // Setup Headers CSV structural array row mapping
-            let csvRows = [["Date", "Description", "Trader/Labor", "Category", "Cash In", "Cash Out", "Running Balance", "Notes"]];
+            let csvRows = [["Date", "Description", "Trader/Labor", "Category", "Payment Status", "Cash In", "Cash Out", "Running Balance", "Notes"]];
             const sorted = computeBalances();
 
             sorted.forEach(e => {
@@ -867,6 +910,7 @@
                     `"${(e.description || '').replace(/"/g, '""')}"`,
                     `"${(getTraderOrLaborName(e.trader) || '').replace(/"/g, '""')}"`,
                     e.category,
+                    e.status || 'Paid',
                     e.type === 'in' ? e.amount : 0,
                     e.type === 'out' ? e.amount : 0,
                     e.balance,
@@ -903,6 +947,7 @@
                     description: document.getElementById('f-desc').value,
                     category: document.getElementById('f-category').value,
                     trader: document.getElementById('f-trader') ? document.getElementById('f-trader').value : '',
+                    status: document.getElementById('f-status').value,
                     amount: document.getElementById('f-amount').value,
                     notes: document.getElementById('f-notes').value,
                     type: currentType
@@ -923,6 +968,7 @@
                 if (draft.category) document.getElementById('f-category').value = draft.category;
                 populateTraderSelect();
                 if (draft.trader && document.getElementById('f-trader')) document.getElementById('f-trader').value = draft.trader;
+                if (draft.status) document.getElementById('f-status').value = draft.status;
                 if (draft.amount) document.getElementById('f-amount').value = draft.amount;
                 if (typeof draft.notes === 'string') document.getElementById('f-notes').value = draft.notes;
             } catch (e) { /* ignore */ }
@@ -991,13 +1037,13 @@
 
                 const tr = document.createElement('tr');
                 tr.innerHTML = `
-            <td>${escapeHtml(t.name)}</td>
-            <td>${escapeHtml(t.phone || '')}</td>
-            <td class="num" style="font-weight:700; color:${balColor}; text-align:right;">${fmt(netBal)}</td>
-            <td class="row-actions">
-                <button class="edit-trader" data-id="${t.id}">Edit</button>
-                <button class="del-trader" data-id="${t.id}">Delete</button>
-            </td>`;
+                <td>${escapeHtml(t.name)}</td>
+                <td>${escapeHtml(t.phone || '')}</td>
+                <td class="num" style="font-weight:700; color:${balColor}; text-align:right;">${fmt(netBal)}</td>
+                <td class="row-actions">
+                    <button class="edit-trader" data-id="${t.id}">Edit</button>
+                    <button class="del-trader" data-id="${t.id}">Delete</button>
+                </td>`;
                 body.appendChild(tr);
             });
             body.querySelectorAll('.edit-trader').forEach(b => b.addEventListener('click', () => startEditTrader(b.dataset.id)));
@@ -1095,13 +1141,13 @@
 
                 const tr = document.createElement('tr');
                 tr.innerHTML = `
-            <td>${escapeHtml(l.name)}</td>
-            <td>${escapeHtml(l.phone || '')}</td>
-            <td class="num" style="font-weight:700; color:${balColor}; text-align:right;">${fmt(netBal)}</td>
-            <td class="row-actions">
-                <button class="edit-labor" data-id="${l.id}">Edit</button>
-                <button class="del-labor" data-id="${l.id}">Delete</button>
-            </td>`;
+                <td>${escapeHtml(l.name)}</td>
+                <td>${escapeHtml(l.phone || '')}</td>
+                <td class="num" style="font-weight:700; color:${balColor}; text-align:right;">${fmt(netBal)}</td>
+                <td class="row-actions">
+                    <button class="edit-labor" data-id="${l.id}">Edit</button>
+                    <button class="del-labor" data-id="${l.id}">Delete</button>
+                </td>`;
                 body.appendChild(tr);
             });
             body.querySelectorAll('.edit-labor').forEach(b => b.addEventListener('click', () => startEditLabor(b.dataset.id)));
@@ -1207,6 +1253,15 @@
             renderSummary();
         }
 
+        // Toggles status flag immediately on badge click without loading full edit form
+        async function toggleStatusDirectly(id) {
+            const entry = state.entries.find(e => e.id === id);
+            if (!entry) return;
+            entry.status = (entry.status === 'Pending') ? 'Paid' : 'Pending';
+            await window.storage.set(STORAGE_KEY, JSON.stringify(state));
+            render();
+        }
+
         function renderCashBook() {
             const body = document.getElementById('entries-body');
             body.innerHTML = '';
@@ -1219,25 +1274,34 @@
             });
 
             if (filteredEntries.length === 0) {
-                body.innerHTML = `<tr><td colspan="8" class="empty-note" style="padding:24px;">No transactions match the filter selection.</td></tr>`;
+                body.innerHTML = `<tr><td colspan="9" class="empty-note" style="padding:24px;">No transactions match the filter selection.</td></tr>`;
                 return;
             }
 
             filteredEntries.forEach(e => {
                 const tr = document.createElement('tr');
+                const isPending = e.status === 'Pending';
+                if (isPending) {
+                    tr.classList.add('pending-row');
+                }
+
+                const statusText = isPending ? 'PENDING' : 'PAID';
+                const statusClass = isPending ? 'pending' : 'paid';
+
                 tr.innerHTML = `
-                    <td>${e.date}</td>
-                    <td>${escapeHtml(e.description || '')}</td>
-                    <td>${escapeHtml(getTraderOrLaborName(e.trader))}</td>
-                    <td><span class="cat-tag">${escapeHtml(e.category)}</span></td>
-                    <td class="num in">${e.type === 'in' ? fmt(e.amount) : ''}</td>
-                    <td class="num out">${e.type === 'out' ? fmt(e.amount) : ''}</td>
-                    <td class="num bal ${e.balance < 0 ? 'negative' : ''}">${fmt(e.balance)}</td>
-                    <td class="row-actions">
-                      <button data-copy="${e.id}">Copy</button>
-                      <button data-edit="${e.id}">Edit</button>
-                      <button data-del="${e.id}">Delete</button>
-                    </td>`;
+                        <td>${e.date}</td>
+                        <td>${escapeHtml(e.description || '')}</td>
+                        <td>${escapeHtml(getTraderOrLaborName(e.trader))}</td>
+                        <td><span class="cat-tag">${escapeHtml(e.category)}</span></td>
+                        <td><span class="status-badge ${statusClass}" onclick="toggleStatusDirectly('${e.id}')">${statusText}</span></td>
+                        <td class="num in">${e.type === 'in' ? fmt(e.amount) : ''}</td>
+                        <td class="num out">${e.type === 'out' ? fmt(e.amount) : ''}</td>
+                        <td class="num bal ${e.balance < 0 ? 'negative' : ''}">${fmt(e.balance)}</td>
+                        <td class="row-actions">
+                          <button data-copy="${e.id}">Copy</button>
+                          <button data-edit="${e.id}">Edit</button>
+                          <button data-del="${e.id}">Delete</button>
+                        </td>`;
                 body.appendChild(tr);
             });
             body.querySelectorAll('[data-edit]').forEach(b => b.addEventListener('click', () => startEdit(b.dataset.edit)));
@@ -1263,6 +1327,7 @@
             // Fill the form fields (Keep date as today's date for quick entry)
             document.getElementById('f-date').value = todayStr();
             document.getElementById('f-desc').value = e.description || '';
+            document.getElementById('f-status').value = e.status || 'Paid';
             document.getElementById('f-amount').value = e.amount;
             document.getElementById('f-notes').value = e.notes || '';
             if (document.getElementById('f-trader')) {
@@ -1310,12 +1375,13 @@
             recent.forEach(e => {
                 const li = document.createElement('li');
                 const relationshipName = getTraderOrLaborName(e.trader);
+                const pendingLabel = e.status === 'Pending' ? ' <span style="color:#d9534f; font-weight:bold; font-size:11px;">[CREDIT]</span>' : '';
                 li.innerHTML = `
-                  <div>
-                    <div class="desc">${escapeHtml(e.description || e.category)}</div>
-                    <div class="meta">${e.date} · ${escapeHtml(e.category)}${relationshipName ? (' · ' + escapeHtml(relationshipName)) : ''}</div>
-                  </div>
-                  <div class="amt ${e.type}">${e.type === 'in' ? '+' : '−'}${fmt(e.amount)}</div>`;
+                      <div>
+                        <div class="desc">${escapeHtml(e.description || e.category)}${pendingLabel}</div>
+                        <div class="meta">${e.date} · ${escapeHtml(e.category)}${relationshipName ? (' · ' + escapeHtml(relationshipName)) : ''}</div>
+                      </div>
+                      <div class="amt ${e.type}">${e.type === 'in' ? '+' : '−'}${fmt(e.amount)}</div>`;
                 list.appendChild(li);
             });
         }
@@ -1377,6 +1443,7 @@
 
             document.getElementById('f-date').value = e.date;
             document.getElementById('f-desc').value = e.description || '';
+            document.getElementById('f-status').value = e.status || 'Paid';
             document.getElementById('f-amount').value = e.amount;
             document.getElementById('f-notes').value = e.notes || '';
 
@@ -1415,6 +1482,7 @@
         function clearForm() {
             document.getElementById('f-date').value = todayStr();
             document.getElementById('f-desc').value = '';
+            document.getElementById('f-status').value = 'Paid';
             document.getElementById('f-amount').value = '';
             document.getElementById('f-trader').value = '';
             document.getElementById('f-notes').value = '';
@@ -1482,6 +1550,7 @@
 
             const desc = document.getElementById('f-desc').value.trim();
             const category = document.getElementById('f-category').value;
+            const status = document.getElementById('f-status').value;
             const amount = parseFloat(document.getElementById('f-amount').value);
             const notes = document.getElementById('f-notes').value.trim();
             const trader = document.getElementById('f-trader').value || '';
@@ -1502,20 +1571,19 @@
                 return;
             }
 
-            // ... rest of the saving code remains exactly the same ...
             const openingVal = parseFloat(document.getElementById('opening-input').value);
             state.openingBalance = isNaN(openingVal) ? 0 : openingVal;
 
             if (editingId) {
                 const e = state.entries.find(x => x.id === editingId);
-                Object.assign(e, { date, description: desc, category, type: currentType, amount, notes, trader });
+                Object.assign(e, { date, description: desc, category, type: currentType, status, amount, notes, trader, qty, rate });
                 editingId = null;
                 document.getElementById('save-entry').textContent = 'Add entry';
                 document.getElementById('cancel-edit').style.display = 'none';
             } else {
                 state.entries.push({
                     id: uid(), _seq: state.entries.length,
-                    date, description: desc, category, type: currentType, amount, notes, trader, qty: qty,
+                    date, description: desc, category, type: currentType, status, amount, notes, trader, qty: qty,
                     rate: rate
                 });
             }
@@ -1665,7 +1733,7 @@
                 note.textContent = 'App ready. Syncing updates in background...';
             }
 
-            ['f-date', 'f-desc', 'f-category', 'f-amount', 'f-notes', 'f-trader'].forEach(id => {
+            ['f-date', 'f-desc', 'f-category', 'f-status', 'f-amount', 'f-notes', 'f-trader'].forEach(id => {
                 const el = document.getElementById(id);
                 if (!el) return;
                 el.addEventListener('input', () => {
