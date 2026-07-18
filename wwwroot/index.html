@@ -634,15 +634,24 @@
                     </div>
                 </div>
 
-                <!-- Place this right above the <div class="table-wrap"> in your view-cashbook block -->
-                <div class="field" style="margin-bottom: 14px; display: flex; align-items: center; gap: 10px; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;">
-                    <label style="margin: 0; font-weight: 600;">Filter Table:</label>
-                    <!-- Changed 'type-toggle' to 'filter-toggle' below -->
-                    <div class="filter-toggle" style="display: flex; gap: 8px; flex: none; width: 300px;">
-                        <button type="button" class="filter-btn selected" data-filter="all">All</button>
-                        <button type="button" class="filter-btn" data-filter="in">Cash In</button>
-                        <button type="button" class="filter-btn" data-filter="out">Cash Out</button>
+                <!-- Filter & Export Controls Row -->
+                <div class="field" style="margin-bottom: 14px; display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 10px; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;">
+
+                    <!-- Left Side: Filters -->
+                    <div style="display: flex; align-items: center; gap: 10px;">
+                        <div class="filter-toggle" style="display: flex; gap: 8px; flex: none; width: 300px;">
+                            <button type="button" class="filter-btn selected" data-filter="all">All</button>
+                            <button type="button" class="filter-btn" data-filter="in">Cash In</button>
+                            <button type="button" class="filter-btn" data-filter="out">Cash Out</button>
+                        </div>
                     </div>
+
+                    <!-- Right Side: Exports -->
+                    <div style="display: flex; gap: 10px;">
+                        <button type="button" class="btn secondary" style="padding: 6px 14px; font-size: 12.5px;" onclick="exportToWhatsApp()">📋 Copy Summary for WhatsApp</button>
+                        <button type="button" class="btn secondary" style="padding: 6px 14px; font-size: 12.5px;" onclick="downloadCSV()">💾 Download Excel/CSV File</button>
+                    </div>
+
                 </div>
 
                 <div class="table-wrap">
@@ -791,6 +800,69 @@
             });
         }
 
+        function exportToWhatsApp() {
+            if (state.entries.length === 0) {
+                showModal("No entries found to generate a statement summary.", false, "Export Empty");
+                return;
+            }
+
+            let textStr = `*COCONUT CASH BOOK STATEMENT*\nGenerated: ${new Date().toLocaleDateString('en-IN')}\n\n`;
+            textStr += `Opening Balance: ${fmt(state.openingBalance)}\n`;
+
+            const sorted = sortedEntries();
+            let dynamicRunning = state.openingBalance;
+
+            sorted.forEach(e => {
+                dynamicRunning += (e.type === 'in' ? e.amount : -e.amount);
+                const entityName = getTraderOrLaborName(e.trader);
+                const entityInfo = entityName ? ` (${entityName})` : '';
+                textStr += `\n📅 ${e.date}\n📝 ${e.description || e.category}${entityInfo}\n💰 ${e.type === 'in' ? '+' : '–'}${fmt(e.amount)} | Bal: ${fmt(dynamicRunning)}\n---`;
+            });
+
+            const totalIn = state.entries.filter(e => e.type === 'in').reduce((s, e) => s + e.amount, 0);
+            const totalOut = state.entries.filter(e => e.type === 'out').reduce((s, e) => s + e.amount, 0);
+            textStr += `\n\n*SUMMARY TOTALS*\n📥 Total Cash In: ${fmt(totalIn)}\n📤 Total Cash Out: ${fmt(totalOut)}\n💵 Current Cash Balance: ${fmt(state.openingBalance + totalIn - totalOut)}`;
+
+            navigator.clipboard.writeText(textStr).then(() => {
+                showModal("Statement text formatted and copied to clipboard! You can now paste it directly into WhatsApp.", false, "Copied Successfully");
+            }).catch(() => {
+                showModal("Failed to auto-copy text. Please check browser privacy permissions.", false, "Copy Error");
+            });
+        }
+
+        function downloadCSV() {
+            if (state.entries.length === 0) {
+                showModal("No entries recorded yet to create a download spreadsheet file.", false, "Export Empty");
+                return;
+            }
+
+            // Setup Headers CSV structural array row mapping
+            let csvRows = [["Date", "Description", "Trader/Labor", "Category", "Cash In", "Cash Out", "Running Balance", "Notes"]];
+            const sorted = computeBalances();
+
+            sorted.forEach(e => {
+                csvRows.push([
+                    e.date,
+                    `"${(e.description || '').replace(/"/g, '""')}"`,
+                    `"${(getTraderOrLaborName(e.trader) || '').replace(/"/g, '""')}"`,
+                    e.category,
+                    e.type === 'in' ? e.amount : 0,
+                    e.type === 'out' ? e.amount : 0,
+                    e.balance,
+                    `"${(e.notes || '').replace(/"/g, '""')}"`
+                ]);
+            });
+
+            let csvContent = "data:text/csv;charset=utf-8," + csvRows.map(r => r.join(",")).join("\n");
+            let encodedUri = encodeURI(csvContent);
+            let link = document.createElement("a");
+            link.setAttribute("href", encodedUri);
+            link.setAttribute("download", `coconut_cashbook_${new Date().toISOString().slice(0, 10)}.csv`);
+            document.body.appendChild(link);
+            link.click();
+            document.body.removeChild(link);
+        }
+
         function fmt(n) {
             n = Math.round(Number(n) || 0);
             return '₹' + n.toLocaleString('en-IN');
@@ -878,12 +950,33 @@
             if (!body) return;
             body.innerHTML = '';
             if (!state.traders || state.traders.length === 0) {
-                body.innerHTML = '<tr><td colspan="3" class="empty-note" style="padding:18px;">No traders yet. Add one above.</td></tr>';
+                body.innerHTML = '<tr><td colspan="4" class="empty-note" style="padding:18px;">No traders yet. Add one above.</td></tr>';
                 return;
             }
+
+            const thead = body.closest('table').querySelector('thead tr');
+            thead.innerHTML = '<th>Trader</th><th>Phone</th><th style="text-align:right;">Net Balance</th><th></th>';
+
             state.traders.forEach(t => {
+                const tEntries = state.entries.filter(e => e.trader === t.id);
+                const totalIn = tEntries.filter(e => e.type === 'in').reduce((sum, e) => sum + e.amount, 0);
+                const totalOut = tEntries.filter(e => e.type === 'out').reduce((sum, e) => sum + e.amount, 0);
+                const netBal = totalIn - totalOut;
+
+                // Dynamic Explicit Coloring
+                let balColor = '#2B2419'; // Default dark ink text for zero balance
+                if (netBal > 0) balColor = '#2e7d32'; // Clean Forest Green for positive balance
+                if (netBal < 0) balColor = '#c62828'; // Clear Crimson Red for negative balance
+
                 const tr = document.createElement('tr');
-                tr.innerHTML = `<td>${escapeHtml(t.name)}</td><td>${escapeHtml(t.phone || '')}</td><td class="row-actions"><button class="edit-trader" data-id="${t.id}">Edit</button><button class="del-trader" data-id="${t.id}">Delete</button></td>`;
+                tr.innerHTML = `
+            <td>${escapeHtml(t.name)}</td>
+            <td>${escapeHtml(t.phone || '')}</td>
+            <td class="num" style="font-weight:700; color:${balColor}; text-align:right;">${fmt(netBal)}</td>
+            <td class="row-actions">
+                <button class="edit-trader" data-id="${t.id}">Edit</button>
+                <button class="del-trader" data-id="${t.id}">Delete</button>
+            </td>`;
                 body.appendChild(tr);
             });
             body.querySelectorAll('.edit-trader').forEach(b => b.addEventListener('click', () => startEditTrader(b.dataset.id)));
@@ -961,12 +1054,33 @@
             if (!body) return;
             body.innerHTML = '';
             if (!state.labor || state.labor.length === 0) {
-                body.innerHTML = '<tr><td colspan="3" class="empty-note" style="padding:18px;">No labor records yet. Add one above.</td></tr>';
+                body.innerHTML = '<tr><td colspan="4" class="empty-note" style="padding:18px;">No labor records yet. Add one above.</td></tr>';
                 return;
             }
+
+            const thead = body.closest('table').querySelector('thead tr');
+            thead.innerHTML = '<th>Worker Name</th><th>Phone</th><th style="text-align:right;">Net Paid / Owed</th><th></th>';
+
             state.labor.forEach(l => {
+                const lEntries = state.entries.filter(e => e.trader === l.id);
+                const totalIn = lEntries.filter(e => e.type === 'in').reduce((sum, e) => sum + e.amount, 0);
+                const totalOut = lEntries.filter(e => e.type === 'out').reduce((sum, e) => sum + e.amount, 0);
+                const netBal = totalOut - totalIn;
+
+                // Dynamic Explicit Coloring
+                let balColor = '#2B2419';
+                if (netBal > 0) balColor = '#2e7d32'; // Paid out wages / advance clear
+                if (netBal < 0) balColor = '#c62828'; // Owed to worker / pending settlement
+
                 const tr = document.createElement('tr');
-                tr.innerHTML = `<td>${escapeHtml(l.name)}</td><td>${escapeHtml(l.phone || '')}</td><td class="row-actions"><button class="edit-labor" data-id="${l.id}">Edit</button><button class="del-labor" data-id="${l.id}">Delete</button></td>`;
+                tr.innerHTML = `
+            <td>${escapeHtml(l.name)}</td>
+            <td>${escapeHtml(l.phone || '')}</td>
+            <td class="num" style="font-weight:700; color:${balColor}; text-align:right;">${fmt(netBal)}</td>
+            <td class="row-actions">
+                <button class="edit-labor" data-id="${l.id}">Edit</button>
+                <button class="del-labor" data-id="${l.id}">Delete</button>
+            </td>`;
                 body.appendChild(tr);
             });
             body.querySelectorAll('.edit-labor').forEach(b => b.addEventListener('click', () => startEditLabor(b.dataset.id)));
@@ -1099,6 +1213,7 @@
                     <td class="num out">${e.type === 'out' ? fmt(e.amount) : ''}</td>
                     <td class="num bal ${e.balance < 0 ? 'negative' : ''}">${fmt(e.balance)}</td>
                     <td class="row-actions">
+                      <button data-copy="${e.id}">Copy</button>
                       <button data-edit="${e.id}">Edit</button>
                       <button data-del="${e.id}">Delete</button>
                     </td>`;
@@ -1106,6 +1221,35 @@
             });
             body.querySelectorAll('[data-edit]').forEach(b => b.addEventListener('click', () => startEdit(b.dataset.edit)));
             body.querySelectorAll('[data-del]').forEach(b => b.addEventListener('click', () => deleteEntry(b.dataset.del)));
+            body.querySelectorAll('[data-copy]').forEach(b => b.addEventListener('click', () => quickCopyEntry(b.dataset.copy)));
+        }
+
+        function quickCopyEntry(id) {
+            const e = state.entries.find(x => x.id === id);
+            if (!e) return;
+
+            // Clear any active edit states first
+            cancelEdit();
+
+            currentType = e.type;
+            document.querySelector('[data-view="cashbook"]').click();
+
+            updateTypeButtons();
+            populateCategorySelect();
+            document.getElementById('f-category').value = e.category;
+            populateTraderSelect();
+
+            // Fill the form fields (Keep date as today's date for quick entry)
+            document.getElementById('f-date').value = todayStr();
+            document.getElementById('f-desc').value = e.description || '';
+            document.getElementById('f-amount').value = e.amount;
+            document.getElementById('f-notes').value = e.notes || '';
+            if (document.getElementById('f-trader')) {
+                document.getElementById('f-trader').value = e.trader || '';
+            }
+
+            saveDraft();
+            window.scrollTo({ top: 0, behavior: 'smooth' });
         }
 
         function escapeHtml(s) {
