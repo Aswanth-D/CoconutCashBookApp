@@ -963,6 +963,7 @@
             if (event.target && event.target.id === 'cancel-edit') {
                 cancelEdit();
             }
+
             if (event.target && event.target.id === 'save-entry') {
                 const dateInputEl = document.getElementById('f-date');
                 const date = dateInputEl ? dateInputEl.value : '';
@@ -1028,6 +1029,7 @@
                 clearForm();
                 render();
             }
+
             if (event.target && event.target.id === 'opening-save') {
                 const btn = document.getElementById('opening-save');
                 const input = document.getElementById('opening-input');
@@ -1043,6 +1045,52 @@
                     await window.storage.set(STORAGE_KEY, JSON.stringify(state));
                     render();
                 }
+            }
+
+            if (event.target.classList.contains('sel-in') || event.target.classList.contains('sel-out')) {
+                const btn = event.target;
+                currentType = btn.dataset.type;
+                updateTypeButtons();
+                populateCategorySelect();
+                populateTraderSelect();
+            }
+
+            if (event.target.classList.contains('tab-btn')) {
+                const btn = event.target;
+                document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
+                document.querySelectorAll('.view').forEach(v => v.classList.remove('active'));
+                btn.classList.add('active');
+                document.getElementById('view-' + btn.dataset.view).classList.add('active');
+
+                if (btn.dataset.view === 'traders') renderTraders();
+                if (btn.dataset.view === 'labor') renderLabor();
+                if (btn.dataset.view === 'inventory') renderInventoryLedger();
+                if (btn.dataset.view === 'cashbook') populateTraderSelect();
+            }
+
+            if (event.target.classList.contains('filter-btn')) {
+                const btn = event.target;
+                event.stopPropagation();
+                document.querySelectorAll('.filter-btn').forEach(b => b.classList.remove('selected'));
+                btn.classList.add('selected');
+                currentFilter = btn.dataset.filter;
+                renderCashBook();
+            }
+
+            if (event.target.classList.contains('date-btn')) {
+                const btn = event.target;
+                event.stopPropagation();
+                document.querySelectorAll('.date-btn').forEach(b => b.classList.remove('selected'));
+                btn.classList.add('selected');
+                currentDateRange = btn.dataset.date_range || btn.dataset.dateRange;
+
+                const customContainer = document.getElementById('custom-date-container');
+                if (currentDateRange === 'custom') {
+                    customContainer.style.display = 'flex';
+                } else {
+                    customContainer.style.display = 'none';
+                }
+                renderCashBook();
             }
         });
 
@@ -1134,56 +1182,6 @@
             document.querySelector('.sel-in').classList.toggle('selected', currentType === 'in');
             document.querySelector('.sel-out').classList.toggle('selected', currentType === 'out');
         }
-
-        document.querySelectorAll('.type-toggle button').forEach(btn => {
-            btn.addEventListener('click', () => {
-                currentType = btn.dataset.type;
-                updateTypeButtons();
-                populateCategorySelect();
-                populateTraderSelect();
-            });
-        });
-
-        document.querySelectorAll('.tab-btn').forEach(btn => {
-            btn.addEventListener('click', () => {
-                document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
-                document.querySelectorAll('.view').forEach(v => v.classList.remove('active'));
-                btn.classList.add('active');
-                document.getElementById('view-' + btn.dataset.view).classList.add('active');
-
-                if (btn.dataset.view === 'traders') renderTraders();
-                if (btn.dataset.view === 'labor') renderLabor();
-                if (btn.dataset.view === 'inventory') renderInventoryLedger();
-                if (btn.dataset.view === 'cashbook') populateTraderSelect();
-            });
-        });
-
-        document.querySelectorAll('.filter-btn').forEach(btn => {
-            btn.addEventListener('click', (e) => {
-                e.stopPropagation();
-                document.querySelectorAll('.filter-btn').forEach(b => b.classList.remove('selected'));
-                btn.classList.add('selected');
-                currentFilter = btn.dataset.filter;
-                renderCashBook();
-            });
-        });
-
-        document.querySelectorAll('.date-btn').forEach(btn => {
-            btn.addEventListener('click', (e) => {
-                e.stopPropagation();
-                document.querySelectorAll('.date-btn').forEach(b => b.classList.remove('selected'));
-                btn.classList.add('selected');
-                currentDateRange = btn.dataset.date_range || btn.dataset.dateRange;
-
-                const customContainer = document.getElementById('custom-date-container');
-                if (currentDateRange === 'custom') {
-                    customContainer.style.display = 'flex';
-                } else {
-                    customContainer.style.display = 'none';
-                }
-                renderCashBook();
-            });
-        });
 
         function suggestLastRate() {
             const currentCategory = document.getElementById('f-category').value;
