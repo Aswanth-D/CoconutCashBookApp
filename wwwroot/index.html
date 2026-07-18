@@ -559,9 +559,7 @@
             <!-- INVENTORY / STOCK LEDGER -->
             <div class="view" id="view-inventory">
                 <h2 class="section-title">Stock Status Balance Summary</h2>
-                <div class="kpis" id="stock-kpis" style="margin-bottom: 26px;">
-                    <!-- Rendered dynamically by JS -->
-                </div>
+                <div class="kpis" id="stock-kpis" style="margin-bottom: 26px;"></div>
 
                 <!-- UNIFIED BATCH ENTRY FORM -->
                 <h2 class="section-title">Log Coconut Processing Batch</h2>
@@ -626,14 +624,14 @@
                         </div>
                     </div>
                     <div class="form-actions">
-                        <button type="button" class="btn secondary" id="trader-cancel" style="display:none;">Cancel</button>
+                        <button type="button" class="btn secondary" id="trader-cancel" onclick="cancelEditTrader()" style="display:none;">Cancel</button>
                         <button type="button" class="btn" id="trader-save" onclick="addTrader()">Add trader</button>
                     </div>
                 </div>
 
                 <div class="table-wrap">
                     <table>
-                        <thead><tr><th>Trader</th><th>Phone</th><th></th></tr></thead>
+                        <thead><tr><th>Trader</th><th>Phone</th><th style="text-align:right;">Net Balance</th><th></th></tr></thead>
                         <tbody id="traders-body"></tbody>
                     </table>
                 </div>
@@ -654,14 +652,14 @@
                         </div>
                     </div>
                     <div class="form-actions">
-                        <button type="button" class="btn secondary" id="labor-cancel" style="display:none;">Cancel</button>
+                        <button type="button" class="btn secondary" id="labor-cancel" onclick="cancelEditLabor()" style="display:none;">Cancel</button>
                         <button type="button" class="btn" id="labor-save" onclick="addLabor()">Add worker</button>
                     </div>
                 </div>
 
                 <div class="table-wrap">
                     <table>
-                        <thead><tr><th>Worker Name</th><th>Phone</th><th></th></tr></thead>
+                        <thead><tr><th>Worker Name</th><th>Phone</th><th style="text-align:right;">Net Paid / Owed</th><th></th></tr></thead>
                         <tbody id="labor-body"></tbody>
                     </table>
                 </div>
@@ -754,7 +752,6 @@
                 <!-- Advanced Date Filters and Actions Row -->
                 <div style="background: var(--card); border: 1px solid var(--line); border-radius: 10px; padding: 14px; margin-bottom: 14px; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;">
                     <div style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 12px;">
-
                         <!-- Filter Block Left -->
                         <div style="display: flex; flex-direction: column; gap: 8px; min-width: 320px;">
                             <div style="display: flex; gap: 6px;" class="filter-toggle">
@@ -820,13 +817,13 @@
                 <div class="summary-grid">
                     <div class="table-wrap">
                         <table>
-                            <thead><tr><th>Cash in by category</th><th style="text-align:right;">Total</th></tr></thead>
+                            <thead><tr><th>Summary In</th><th style="text-align:right;">Total</th></tr></thead>
                             <tbody id="cat-in-body"></tbody>
                         </table>
                     </div>
                     <div class="table-wrap">
                         <table>
-                            <thead><tr><th>Cash out by category</th><th style="text-align:right;">Total</th></tr></thead>
+                            <thead><tr><th>Summary Out</th><th style="text-align:right;">Total</th></tr></thead>
                             <tbody id="cat-out-body"></tbody>
                         </table>
                     </div>
@@ -834,9 +831,7 @@
 
                 <!-- PROFITABILITY ANALYTICS ENGINE -->
                 <h2 class="section-title" style="margin-top: 26px;">📈 Profitability Analytics Engine</h2>
-                <div class="kpis" id="analytics-kpis" style="margin-bottom: 22px;">
-                    <!-- Rendered dynamically by JS -->
-                </div>
+                <div class="kpis" id="analytics-kpis" style="margin-bottom: 22px;"></div>
                 <div class="table-wrap" style="margin-bottom: 26px;">
                     <table>
                         <thead>
@@ -866,7 +861,7 @@
                             Type <span style="background:#ffe3e3; padding: 2px 6px; border-radius:4px;">RESET</span> below to unlock the purge button:
                         </label>
                         <input type="text" id="purge-lock-input" oninput="checkPurgeLock()" placeholder="Type RESET here"
-                               style="width: 100%; max-width: 240px; text-align: center; border: 1px solid #fabdbd; border-radius: 6px; padding: 6px; font-weight: bold; uppercase;">
+                               style="width: 100%; max-width: 240px; text-align: center; border: 1px solid #fabdbd; border-radius: 6px; padding: 6px; font-weight: bold; text-transform: uppercase;">
                     </div>
 
                     <button type="button" id="purge-data-btn" class="btn" disabled
@@ -879,6 +874,18 @@
 
             <p class="save-note" id="save-note">Connecting to cloud database...</p>
         </main>
+    </div>
+
+    <!-- Custom Elegant Modal Popup -->
+    <div id="custom-modal" style="display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(43, 36, 25, 0.4); backdrop-filter: blur(2px); z-index: 10000; align-items: center; justify-content: center;">
+        <div style="background: #FFFDF6; border: 2px solid #5B3A20; border-radius: 12px; width: 90%; max-width: 400px; padding: 24px; box-shadow: 0 8px 24px rgba(0,0,0,0.15); font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; text-align: center;">
+            <h3 id="modal-title" style="margin: 0 0 10px; font-family: Georgia, serif; color: #3E2712; font-size: 18px; font-weight: normal;">Notice</h3>
+            <p id="modal-msg" style="margin: 0 0 20px; color: #2B2419; font-size: 14px; line-height: 1.5;"></p>
+            <div style="display: flex; justify-content: center; gap: 12px;">
+                <button id="modal-cancel-btn" class="btn secondary" style="padding: 8px 16px; font-size: 13px; display: none;">Cancel</button>
+                <button id="modal-ok-btn" class="btn" style="padding: 8px 20px; font-size: 13px;">OK</button>
+            </div>
+        </div>
     </div>
 
     <script>
@@ -938,7 +945,7 @@
             out: ["Coconut Purchase", "Labor Wages", "Transport/Freight", "Loading/Unloading", "Storage/Rent", "Electricity/Fuel", "Packing Material", "Maintenance", "Commission/Brokerage", "Loan Repayment", "Other Expense"]
         };
 
-        let state = { openingBalance: 0, entries: [], traders: [], labor: [] };
+        let state = { openingBalance: 0, entries: [], traders: [], labor: [], stockAdjustments: [] };
         let currentType = 'in';
         let currentFilter = 'all';
         let currentDateRange = 'all';
@@ -946,20 +953,17 @@
         let traderEditingId = null;
         let laborEditingId = null;
 
-        // Monitor the input field to unlock the delete button
         function checkPurgeLock() {
             const inputVal = document.getElementById('purge-lock-input').value.trim();
             const btn = document.getElementById('purge-data-btn');
 
             if (inputVal === "RESET") {
-                // Unlock button and apply original danger theme styles
                 btn.removeAttribute('disabled');
                 btn.style.background = 'var(--rust)';
                 btn.style.borderColor = 'var(--rust-dark)';
                 btn.style.color = '#ffffff';
                 btn.style.cursor = 'pointer';
             } else {
-                // Lock button back down if it doesn't match perfectly
                 btn.setAttribute('disabled', 'true');
                 btn.style.background = '#cbd5e1';
                 btn.style.borderColor = '#94a3b8';
@@ -968,40 +972,20 @@
             }
         }
 
-        // --- DANGEROUS: WIPE EVERYTHING FROM LOCAL & CLOUD STORAGE ---
         async function completelyResetAllData() {
-            // First warning
-            const firstConfirm = await showModal(
-                "Are you absolutely sure you want to delete ALL data? This cannot be undone.",
-                true,
-                "⚠️ Warning: Critical Action"
-            );
+            const firstConfirm = await showModal("Are you absolutely sure you want to delete ALL data? This cannot be undone.", true, "⚠️ Warning: Critical Action");
             if (!firstConfirm) return;
 
-            // Second security warning
-            const secondConfirm = await showModal(
-                "Final Confirmation: This will clear your entire Cash Book, Traders database, Labor logs, and Stock ledger permanently. Proceed?",
-                true,
-                "🚨 Final Warning"
-            );
+            const secondConfirm = await showModal("Final Confirmation: This will clear your entire Cash Book, Traders database, Labor logs, and Stock ledger permanently. Proceed?", true, "🚨 Final Warning");
             if (!secondConfirm) return;
 
-            // 1. Reset the local state object back to factory defaults
-            state = {
-                openingBalance: 0,
-                entries: [],
-                traders: [],
-                labor: [],
-                stockAdjustments: []
-            };
+            state = { openingBalance: 0, entries: [], traders: [], labor: [], stockAdjustments: [] };
 
-            // 2. Clear out the persistent local cache
             try {
                 localStorage.removeItem(STORAGE_KEY);
                 localStorage.removeItem(DRAFT_KEY);
             } catch (e) { console.error("Error clearing localStorage:", e); }
 
-            // 3. Update the remote cloud database with the empty state
             const note = document.getElementById('save-note');
             if (note) note.textContent = 'Purging remote system...';
 
@@ -1009,7 +993,6 @@
                 const { error } = await supabaseClient
                     .from('app_state')
                     .upsert({ id: 'main', state: state }, { onConflict: 'id' });
-
                 if (error) throw error;
                 if (note) note.textContent = 'All records successfully wiped from cloud.';
             } catch (e) {
@@ -1017,10 +1000,7 @@
                 if (note) note.textContent = 'Wiped locally, cloud sync pending connection.';
             }
 
-            // 4. Force UI refresh across all view modules to reflect the zeroed-out state
             document.getElementById('opening-input').value = 0;
-
-            // Clear processing fields if any text remains
             if (document.getElementById('stk-input-coconuts')) {
                 document.getElementById('stk-input-coconuts').value = '';
                 document.getElementById('stk-out-copra').value = '';
@@ -1028,16 +1008,12 @@
                 document.getElementById('stk-desc').value = '';
             }
 
-            // Re-render empty elements
             renderTraders();
             renderLabor();
             render();
 
-            // Jump user safely back to the dashboard view
             document.querySelector('[data-view="dashboard"]').click();
-
             await showModal("System successfully reset to factory defaults.", false, "System Wiped");
-
             document.getElementById('purge-lock-input').value = '';
             checkPurgeLock();
         }
@@ -1175,12 +1151,16 @@
 
         function populateCategorySelect() {
             const sel = document.getElementById('f-category');
+            const prevVal = sel.value;
             sel.innerHTML = '';
             CATEGORIES[currentType].forEach(c => {
                 const opt = document.createElement('option');
                 opt.value = c; opt.textContent = c;
                 sel.appendChild(opt);
             });
+            if (prevVal && CATEGORIES[currentType].includes(prevVal)) {
+                sel.value = prevVal;
+            }
         }
 
         // --- Traders Management ---
@@ -1209,6 +1189,7 @@
             if (phoneEl) phoneEl.value = '';
             renderTraders();
             populateTraderSelect();
+            render();
         }
 
         function renderTraders() {
@@ -1219,8 +1200,6 @@
                 body.innerHTML = '<tr><td colspan="4" class="empty-note" style="padding:18px;">No traders yet.</td></tr>';
                 return;
             }
-            const thead = body.closest('table').querySelector('thead tr');
-            thead.innerHTML = '<th>Trader</th><th>Phone</th><th style="text-align:right;">Net Balance</th><th></th>';
 
             state.traders.forEach(t => {
                 const tEntries = state.entries.filter(e => e.trader === t.id);
@@ -1231,13 +1210,13 @@
 
                 const tr = document.createElement('tr');
                 tr.innerHTML = `
-                                        <td>${escapeHtml(t.name)}</td>
-                                        <td>${escapeHtml(t.phone || '')}</td>
-                                        <td class="num" style="font-weight:700; color:${balColor}; text-align:right;">${fmt(netBal)}</td>
-                                        <td class="row-actions">
-                                            <button class="edit-trader" data-id="${t.id}">Edit</button>
-                                            <button class="del-trader" data-id="${t.id}">Delete</button>
-                                        </td>`;
+                        <td>${escapeHtml(t.name)}</td>
+                        <td>${escapeHtml(t.phone || '')}</td>
+                        <td class="num" style="font-weight:700; color:${balColor}; text-align:right;">${fmt(netBal)}</td>
+                        <td class="row-actions">
+                            <button class="edit-trader" data-id="${t.id}">Edit</button>
+                            <button class="del-trader" data-id="${t.id}">Delete</button>
+                        </td>`;
                 body.appendChild(tr);
             });
             body.querySelectorAll('.edit-trader').forEach(b => b.addEventListener('click', () => startEditTrader(b.dataset.id)));
@@ -1303,6 +1282,7 @@
             if (phoneEl) phoneEl.value = '';
             renderLabor();
             populateTraderSelect();
+            render();
         }
 
         function renderLabor() {
@@ -1313,25 +1293,23 @@
                 body.innerHTML = '<tr><td colspan="4" class="empty-note" style="padding:18px;">No labor records yet.</td></tr>';
                 return;
             }
-            const thead = body.closest('table').querySelector('thead tr');
-            thead.innerHTML = '<th>Worker Name</th><th>Phone</th><th style="text-align:right;">Net Paid / Owed</th><th></th>';
 
             state.labor.forEach(l => {
                 const lEntries = state.entries.filter(e => e.trader === l.id);
                 const totalIn = lEntries.filter(e => e.type === 'in').reduce((sum, e) => sum + e.amount, 0);
                 const totalOut = lEntries.filter(e => e.type === 'out').reduce((sum, e) => sum + e.amount, 0);
-                const netBal = totalOut - totalIn;
-                let balColor = netBal > 0 ? '#2e7d32' : (netBal < 0 ? '#c62828' : '#2B2419');
+                const netBal = totalOut - totalIn; // Amount owed to labor
+                let balColor = netBal > 0 ? '#c62828' : (netBal < 0 ? '#2e7d32' : '#2B2419');
 
                 const tr = document.createElement('tr');
                 tr.innerHTML = `
-                                        <td>${escapeHtml(l.name)}</td>
-                                        <td>${escapeHtml(l.phone || '')}</td>
-                                        <td class="num" style="font-weight:700; color:${balColor}; text-align:right;">${fmt(netBal)}</td>
-                                        <td class="row-actions">
-                                            <button class="edit-labor" data-id="${l.id}">Edit</button>
-                                            <button class="del-labor" data-id="${l.id}">Delete</button>
-                                        </td>`;
+                        <td>${escapeHtml(l.name)}</td>
+                        <td>${escapeHtml(l.phone || '')}</td>
+                        <td class="num" style="font-weight:700; color:${balColor}; text-align:right;">${fmt(netBal)}</td>
+                        <td class="row-actions">
+                            <button class="edit-labor" data-id="${l.id}">Edit</button>
+                            <button class="del-labor" data-id="${l.id}">Delete</button>
+                        </td>`;
                 body.appendChild(tr);
             });
             body.querySelectorAll('.edit-labor').forEach(b => b.addEventListener('click', () => startEditLabor(b.dataset.id)));
@@ -1377,6 +1355,7 @@
             const categoryEl = document.getElementById('f-category');
             if (!sel) return;
 
+            const prevSelection = sel.value;
             sel.innerHTML = '';
             const none = document.createElement('option'); none.value = ''; none.textContent = '— none —';
             sel.appendChild(none);
@@ -1394,6 +1373,7 @@
                     sel.appendChild(opt);
                 });
             }
+            sel.value = prevSelection || '';
         }
 
         function getTraderOrLaborName(id) {
@@ -1417,7 +1397,6 @@
             });
         }
 
-        // --- NEW FUNCTION: Save Unified Processing Batch ---
         async function saveProcessingBatch() {
             const date = document.getElementById('stk-date').value;
             const inputCoconuts = parseFloat(document.getElementById('stk-input-coconuts').value);
@@ -1438,23 +1417,19 @@
                 state.stockAdjustments = [];
             }
 
-            // Generate a shared batch ID so the items stay grouped together
             const batchId = 'batch-' + Date.now().toString(36);
             const notes = description || `Batch processing run`;
 
-            // 1. Deduct the raw coconuts used
             state.stockAdjustments.push({
                 id: uid(), batchId, date, commodity: 'Coconuts', direction: 'reduction', qty: inputCoconuts, description: `${notes} (Coconuts Used)`
             });
 
-            // 2. Add Copra if produced
             if (outCopra > 0) {
                 state.stockAdjustments.push({
                     id: uid(), batchId, date, commodity: 'Copra', direction: 'addition', qty: outCopra, description: `${notes} (Copra Yield)`
                 });
             }
 
-            // 3. Add Husk if produced
             if (outHusk > 0) {
                 state.stockAdjustments.push({
                     id: uid(), batchId, date, commodity: 'Husk/Shell', direction: 'addition', qty: outHusk, description: `${notes} (Husk Yield)`
@@ -1463,7 +1438,6 @@
 
             await window.storage.set(STORAGE_KEY, JSON.stringify(state));
 
-            // Clear input form fields
             document.getElementById('stk-input-coconuts').value = '';
             document.getElementById('stk-out-copra').value = '';
             document.getElementById('stk-out-husk').value = '';
@@ -1472,7 +1446,6 @@
             renderInventoryLedger();
         }
 
-        // --- NEW FUNCTION: Delete Entire Processing Batch ---
         async function deleteProcessingBatch(batchId) {
             if (!await showModal("Permanently remove all stock changes linked to this processing batch?", true, "Confirm Deletion")) return;
             if (state.stockAdjustments) {
@@ -1482,7 +1455,6 @@
             }
         }
 
-        // --- UPDATED INVENTORY LEDGER RENDERER ---
         function renderInventoryLedger() {
             const kpiContainer = document.getElementById('stock-kpis');
             const body = document.getElementById('inventory-body');
@@ -1492,18 +1464,10 @@
                 document.getElementById('stk-date').value = todayStr();
             }
 
-            const inventoryTotals = {
-                "Coconuts": 0,
-                "Copra": 0,
-                "Husk/Shell": 0,
-                "Oil": 0
-            };
-
+            const inventoryTotals = { "Coconuts": 0, "Copra": 0, "Husk/Shell": 0, "Oil": 0 };
             const stockMovements = [];
 
-            // 1. Process Cash Book Entries
             sortedEntries().forEach(e => {
-                // Determine the correct quantity for inventory tracking (calculated whole units if Ton, else standard qty)
                 const ledgerQty = e.stockQty !== undefined && e.stockQty !== null ? e.stockQty : (e.qty || 0);
                 if (ledgerQty <= 0) return;
 
@@ -1513,7 +1477,7 @@
                 else if (e.category && e.category.includes("Water")) commodity = "Water";
                 else if (e.category && (e.category.includes("Husk") || e.category.includes("Shell"))) commodity = "Husk/Shell";
 
-                const isAddition = (e.type === 'out'); // Cash Out = Stock Purchase
+                const isAddition = (e.type === 'out');
                 const directionText = isAddition ? "➕ Inbound Stock Purchase" : "➖ Outbound Stock Sale";
 
                 if (isAddition) {
@@ -1522,7 +1486,6 @@
                     inventoryTotals[commodity] -= ledgerQty;
                 }
 
-                // If the entry used Ton calculations, format the log to display structural transparency
                 const displayNotes = e.unit === 'Ton'
                     ? `${getTraderOrLaborName(e.trader) || 'Direct Transaction'} (${e.qty} Ton @ ₹${e.rate}/Ton)`
                     : (getTraderOrLaborName(e.trader) || 'Direct Transaction');
@@ -1531,14 +1494,13 @@
                     date: e.date,
                     commodity: commodity,
                     direction: directionText,
-                    qty: ledgerQty, // Strictly displays the calculated whole unit counts in the ledger view
-                    rate: e.unit === 'Ton' ? 0 : (e.rate || 0), // Prevents per-ton rate from appearing as a per-unit rate
+                    qty: ledgerQty,
+                    rate: e.unit === 'Ton' ? 0 : (e.rate || 0),
                     party: displayNotes,
                     isAdjustment: false
                 });
             });
 
-            // 2. Process Batch Adjustments
             if (state.stockAdjustments && Array.isArray(state.stockAdjustments)) {
                 state.stockAdjustments.forEach(adj => {
                     const isAddition = (adj.direction === 'addition');
@@ -1565,13 +1527,12 @@
 
             stockMovements.sort((a, b) => (a.date > b.date ? 1 : a.date < b.date ? -1 : 0));
 
-            // Render Balances
             kpiContainer.innerHTML = Object.keys(inventoryTotals).map(item => `
-                <div class="kpi">
-                    <div class="label">${item} Balance Stock</div>
-                    <div class="value" style="color: var(--palm-dark); font-weight: bold;">${inventoryTotals[item].toLocaleString()} Units</div>
-                </div>
-            `).join('');
+                    <div class="kpi">
+                        <div class="label">${item} Balance Stock</div>
+                        <div class="value" style="color: var(--palm-dark); font-weight: bold;">${inventoryTotals[item].toLocaleString()} Units</div>
+                    </div>
+                `).join('');
 
             body.innerHTML = '';
             if (stockMovements.length === 0) {
@@ -1579,12 +1540,10 @@
                 return;
             }
 
-            // Keep unique track of printed batch delete buttons per row
             const renderedBatches = new Set();
 
             stockMovements.reverse().forEach(sm => {
                 const tr = document.createElement('tr');
-
                 let actionMarkup = '';
                 if (sm.isAdjustment && sm.batchId && !renderedBatches.has(sm.batchId)) {
                     actionMarkup = `<button onclick="deleteProcessingBatch('${sm.batchId}')" style="color:var(--rust-dark); background:none; border:none; cursor:pointer; font-size:11px; margin-left:8px; font-weight:bold;">❌ Delete Entire Batch</button>`;
@@ -1592,18 +1551,17 @@
                 }
 
                 tr.innerHTML = `
-                    <td>${sm.date}</td>
-                    <td><span class="cat-tag">${sm.commodity}</span></td>
-                    <td style="font-weight: 600; color: ${sm.direction.includes('➕') ? 'var(--palm-dark)' : 'var(--rust-dark)'}">${sm.direction}</td>
-                    <td class="num">${sm.qty.toLocaleString()}</td>
-                    <td class="num">${sm.rate > 0 ? '₹' + sm.rate : '—'}</td>
-                    <td>${escapeHtml(sm.party)} ${actionMarkup}</td>
-                `;
+                        <td>${sm.date}</td>
+                        <td><span class="cat-tag">${sm.commodity}</span></td>
+                        <td style="font-weight: 600; color: ${sm.direction.includes('➕') ? 'var(--palm-dark)' : 'var(--rust-dark)'}">${sm.direction}</td>
+                        <td class="num">${sm.qty.toLocaleString()}</td>
+                        <td class="num">${sm.rate > 0 ? '₹' + sm.rate : '—'}</td>
+                        <td>${escapeHtml(sm.party)} ${actionMarkup}</td>
+                    `;
                 body.appendChild(tr);
             });
         }
 
-        // --- ADVANCED DATE FILTER SYSTEM ---
         function matchDateRange(entryDate) {
             if (currentDateRange === 'all') return true;
 
@@ -1613,12 +1571,9 @@
             const today = new Date();
             today.setHours(0, 0, 0, 0);
 
-            if (currentDateRange === 'today') {
-                return targetDate.getTime() === today.getTime();
-            }
-            if (currentDateRange === 'month') {
-                return targetDate.getMonth() === today.getMonth() && targetDate.getFullYear() === today.getFullYear();
-            }
+            if (currentDateRange === 'today') return targetDate.getTime() === today.getTime();
+            if (currentDateRange === 'month') return targetDate.getMonth() === today.getMonth() && targetDate.getFullYear() === today.getFullYear();
+
             if (currentDateRange === 'lastmonth') {
                 const lastMonth = new Date(today.getFullYear(), today.getMonth() - 1, 1);
                 return targetDate.getMonth() === lastMonth.getMonth() && targetDate.getFullYear() === lastMonth.getFullYear();
@@ -1626,7 +1581,7 @@
             if (currentDateRange === 'custom') {
                 const startInput = document.getElementById('filter-start-date').value;
                 const endInput = document.getElementById('filter-end-date').value;
-                if (!startInput || !endInput) return true; // fallback if dates unchosen
+                if (!startInput || !endInput) return true;
 
                 const start = new Date(startInput); start.setHours(0, 0, 0, 0);
                 const end = new Date(endInput); end.setHours(23, 59, 59, 999);
@@ -1672,19 +1627,19 @@
                 if (isPending) tr.classList.add('pending-row');
 
                 tr.innerHTML = `
-                                                <td>${e.date}</td>
-                                                <td>${escapeHtml(e.description || '')}</td>
-                                                <td>${escapeHtml(getTraderOrLaborName(e.trader))}</td>
-                                                <td><span class="cat-tag">${escapeHtml(e.category)}</span></td>
-                                                <td><span class="status-badge ${isPending ? 'pending' : 'paid'}" onclick="toggleStatusDirectly('${e.id}')">${isPending ? 'PENDING' : 'PAID'}</span></td>
-                                                <td class="num in">${e.type === 'in' ? fmt(e.amount) : ''}</td>
-                                                <td class="num out">${e.type === 'out' ? fmt(e.amount) : ''}</td>
-                                                <td class="num bal ${e.balance < 0 ? 'negative' : ''}">${fmt(e.balance)}</td>
-                                                <td class="row-actions">
-                                                  <button data-copy="${e.id}">Copy</button>
-                                                  <button data-edit="${e.id}">Edit</button>
-                                                  <button data-del="${e.id}">Delete</button>
-                                                </td>`;
+                        <td>${e.date}</td>
+                        <td>${escapeHtml(e.description || '')}</td>
+                        <td>${escapeHtml(getTraderOrLaborName(e.trader))}</td>
+                        <td><span class="cat-tag">${escapeHtml(e.category)}</span></td>
+                        <td><span class="status-badge ${isPending ? 'pending' : 'paid'}" onclick="toggleStatusDirectly('${e.id}')">${isPending ? 'PENDING' : 'PAID'}</span></td>
+                        <td class="num in">${e.type === 'in' ? fmt(e.amount) : ''}</td>
+                        <td class="num out">${e.type === 'out' ? fmt(e.amount) : ''}</td>
+                        <td class="num bal ${e.balance < 0 ? 'negative' : ''}">${fmt(e.balance)}</td>
+                        <td class="row-actions">
+                          <button data-copy="${e.id}">Copy</button>
+                          <button data-edit="${e.id}">Edit</button>
+                          <button data-del="${e.id}">Delete</button>
+                        </td>`;
                 body.appendChild(tr);
             });
             body.querySelectorAll('[data-edit]').forEach(b => b.addEventListener('click', () => startEdit(b.dataset.edit)));
@@ -1745,11 +1700,11 @@
                 const relationshipName = getTraderOrLaborName(e.trader);
                 const pendingLabel = e.status === 'Pending' ? ' <span style="color:#d9534f; font-weight:bold; font-size:11px;">[CREDIT]</span>' : '';
                 li.innerHTML = `
-                                              <div>
-                                                <div class="desc">${escapeHtml(e.description || e.category)}${pendingLabel}</div>
-                                                <div class="meta">${e.date} · ${escapeHtml(e.category)}${relationshipName ? (' · ' + escapeHtml(relationshipName)) : ''}</div>
-                                              </div>
-                                              <div class="amt ${e.type}">${e.type === 'in' ? '+' : '−'}${fmt(e.amount)}</div>`;
+                        <div>
+                          <div class="desc">${escapeHtml(e.description || e.category)}${pendingLabel}</div>
+                          <div class="meta">${e.date} · ${escapeHtml(e.category)}${relationshipName ? (' · ' + escapeHtml(relationshipName)) : ''}</div>
+                        </div>
+                        <div class="amt ${e.type}">${e.type === 'in' ? '+' : '−'}${fmt(e.amount)}</div>`;
                 list.appendChild(li);
             });
         }
@@ -1791,7 +1746,6 @@
                 catOut.appendChild(tr);
             });
 
-            // --- PROFITABILITY ANALYTICS ENGINE LOGIC ---
             const analyticsBody = document.getElementById('analytics-body');
             const analyticsKpis = document.getElementById('analytics-kpis');
 
@@ -1807,12 +1761,10 @@
                 let operationalExpenses = 0;
                 let totalIncomeFramework = 0;
 
-                // Allocate cash transactions across production channels
                 state.entries.forEach(e => {
                     let assigned = false;
                     const cat = e.category || '';
 
-                    // Route revenue and explicit product procurement
                     Object.keys(streams).forEach(stream => {
                         if (cat.includes(stream) || (stream === "Husk/Shell" && cat.includes("Husk"))) {
                             streams[stream][e.type] += e.amount;
@@ -1820,7 +1772,6 @@
                         }
                     });
 
-                    // Route operational overhead structural elements
                     if (!assigned) {
                         if (e.type === 'out') {
                             operationalExpenses += e.amount;
@@ -1832,29 +1783,26 @@
                     if (e.type === 'in') totalIncomeFramework += e.amount;
                 });
 
-                // Compute and render table metrics
                 analyticsBody.innerHTML = '';
                 Object.keys(streams).forEach(stream => {
                     const data = streams[stream];
                     const netMargin = data.in - data.out;
                     const totalCost = data.out;
 
-                    // Profitability Index = Revenue / Cost (or metric default baseline standard)
                     const pi = totalCost > 0 ? (data.in / totalCost).toFixed(2) : (data.in > 0 ? '∞' : '0.00');
                     const marginColor = netMargin >= 0 ? 'var(--palm-dark)' : 'var(--rust-dark)';
 
                     const tr = document.createElement('tr');
                     tr.innerHTML = `
-                        <td><span class="cat-tag">${stream}</span></td>
-                        <td class="num in">${fmt(data.in)}</td>
-                        <td class="num out">${fmt(data.out)}</td>
-                        <td class="num" style="font-weight:700; color:${marginColor}">${fmt(netMargin)}</td>
-                        <td class="num" style="font-weight:700; color:${pi > 1 || pi === '∞' ? 'var(--palm-dark)' : 'var(--ink)'}">${pi}x</td>
-                    `;
+                            <td><span class="cat-tag">${stream}</span></td>
+                            <td class="num in">${fmt(data.in)}</td>
+                            <td class="num out">${fmt(data.out)}</td>
+                            <td class="num" style="font-weight:700; color:${marginColor}">${fmt(netMargin)}</td>
+                            <td class="num" style="font-weight:700; color:${pi > 1 || pi === '∞' ? 'var(--palm-dark)' : 'var(--ink)'}">${pi}x</td>
+                        `;
                     analyticsBody.appendChild(tr);
                 });
 
-                // Render High-Level Operational KPI Cards
                 const totalDirectCost = Object.values(streams).reduce((acc, curr) => acc + curr.out, 0);
                 const netProductMargin = totalIncomeFramework - totalDirectCost - operationalExpenses;
                 const roiPercent = (totalDirectCost + operationalExpenses) > 0
@@ -1862,19 +1810,19 @@
                     : '0.0';
 
                 analyticsKpis.innerHTML = `
-                    <div class="kpi">
-                        <div class="label">Indirect Overhead (Labor/Freight)</div>
-                        <div class="value" style="color: var(--rust-dark);">${fmt(operationalExpenses)}</div>
-                    </div>
-                    <div class="kpi">
-                        <div class="label">Net Enterprise Profit</div>
-                        <div class="value" style="color: ${netProductMargin >= 0 ? 'var(--palm-dark)' : 'var(--rust-dark)'}; font-weight: bold;">${fmt(netProductMargin)}</div>
-                    </div>
-                    <div class="kpi">
-                        <div class="label">Return on Capital Invested</div>
-                        <div class="value" style="color: var(--husk-dark); font-weight: bold;">${roiPercent}%</div>
-                    </div>
-                `;
+                        <div class="kpi">
+                            <div class="label">Indirect Overhead (Labor/Freight)</div>
+                            <div class="value" style="color: var(--rust-dark);">${fmt(operationalExpenses)}</div>
+                        </div>
+                        <div class="kpi">
+                            <div class="label">Net Enterprise Profit</div>
+                            <div class="value" style="color: ${netProductMargin >= 0 ? 'var(--palm-dark)' : 'var(--rust-dark)'}; font-weight: bold;">${fmt(netProductMargin)}</div>
+                        </div>
+                        <div class="kpi">
+                            <div class="label">Return on Capital Invested</div>
+                            <div class="value" style="color: var(--husk-dark); font-weight: bold;">${roiPercent}%</div>
+                        </div>
+                    `;
             }
         }
 
@@ -1890,7 +1838,7 @@
                 document.getElementById('qty-field-label').textContent = 'Quantity (Units)';
                 document.getElementById('rate-field-label').textContent = 'Rate per Unit (₹)';
                 convBox.style.display = 'none';
-                document.getElementById('f-conv').value = ''; // Clear conversion if switched back
+                document.getElementById('f-conv').value = '';
             }
         }
 
@@ -2020,7 +1968,6 @@
             const rate = isCalcActive ? parseFloat(document.getElementById('f-rate').value) || 0 : null;
             const convFactor = isCalcActive ? parseInt(document.getElementById('f-conv').value) || 0 : 0;
 
-            // --- FIXED: Calculate Stock Quantity strictly for ledger inventory balance routing ---
             let stockQty = 0;
             if (isCalcActive && qty > 0) {
                 if (unit === 'Ton') {
@@ -2029,7 +1976,6 @@
                     stockQty = Math.round(qty);
                 }
             } else if (!isCalcActive) {
-                // If calculator is off, check if description contains an inline number as fallback
                 const inlineMatches = desc.match(/\b\d+\b/);
                 if (inlineMatches) stockQty = parseInt(inlineMatches[0], 10);
             }
@@ -2043,7 +1989,6 @@
                 return;
             }
 
-            // If using the calculator, force a structural block warning if quantity was left zero
             if (isCalcActive && stockQty <= 0) {
                 await showModal('Please specify a valid quantity greater than 0 to correctly update the Stock Ledger.', false, 'Invalid Quantity');
                 return;
@@ -2067,8 +2012,6 @@
             render();
         });
 
-        document.getElementById('cancel-edit').addEventListener('click', cancelEdit);
-
         document.getElementById('opening-save').addEventListener('click', async () => {
             const btn = document.getElementById('opening-save');
             const input = document.getElementById('opening-input');
@@ -2086,7 +2029,6 @@
             }
         });
 
-        // Cash Flow Filter Toggles
         document.querySelectorAll('.filter-btn').forEach(btn => {
             btn.addEventListener('click', (e) => {
                 e.stopPropagation();
@@ -2097,7 +2039,6 @@
             });
         });
 
-        // Advanced Custom Date Filtering Toggles
         document.querySelectorAll('.date-btn').forEach(btn => {
             btn.addEventListener('click', (e) => {
                 e.stopPropagation();
@@ -2221,17 +2162,5 @@
         }
         init();
     </script>
-
-    <!-- Custom Elegant Modal Popup -->
-    <div id="custom-modal" style="display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(43, 36, 25, 0.4); backdrop-filter: blur(2px); z-index: 10000; align-items: center; justify-content: center;">
-        <div style="background: #FFFDF6; border: 2px solid #5B3A20; border-radius: 12px; width: 90%; max-width: 400px; padding: 24px; box-shadow: 0 8px 24px rgba(0,0,0,0.15); font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; text-align: center;">
-            <h3 id="modal-title" style="margin: 0 0 10px; font-family: Georgia, serif; color: #3E2712; font-size: 18px; font-weight: normal;">Notice</h3>
-            <p id="modal-msg" style="margin: 0 0 20px; color: #2B2419; font-size: 14px; line-height: 1.5;"></p>
-            <div style="display: flex; justify-content: center; gap: 12px;">
-                <button id="modal-cancel-btn" class="btn secondary" style="padding: 8px 16px; font-size: 13px; display: none;">Cancel</button>
-                <button id="modal-ok-btn" class="btn" style="padding: 8px 20px; font-size: 13px;">OK</button>
-            </div>
-        </div>
-    </div>
 </body>
 </html>
