@@ -765,6 +765,32 @@
         let traderEditingId = null;
         let laborEditingId = null;
 
+        // Custom Elegant Popup Helpers
+        function showModal(message, isConfirm = false, title = "Notice") {
+            return new Promise((resolve) => {
+                const modal = document.getElementById('custom-modal');
+                const titleEl = document.getElementById('modal-title');
+                const msgEl = document.getElementById('modal-msg');
+                const okBtn = document.getElementById('modal-ok-btn');
+                const cancelBtn = document.getElementById('modal-cancel-btn');
+
+                titleEl.textContent = title;
+                msgEl.textContent = message;
+                cancelBtn.style.display = isConfirm ? 'inline-block' : 'none';
+                modal.style.display = 'flex';
+
+                function cleanup(value) {
+                    modal.style.display = 'none';
+                    okBtn.onclick = null;
+                    cancelBtn.onclick = null;
+                    resolve(value);
+                }
+
+                okBtn.onclick = () => cleanup(true);
+                cancelBtn.onclick = () => cleanup(false);
+            });
+        }
+
         function fmt(n) {
             n = Math.round(Number(n) || 0);
             return '₹' + n.toLocaleString('en-IN');
@@ -826,7 +852,11 @@
             if (!nameEl) return;
             const name = (nameEl.value || '').trim();
             const phone = phoneEl ? (phoneEl.value || '').trim() : '';
-            if (!name) { alert('Enter a name for the trader.'); nameEl.focus(); return; }
+            if (!name) {
+                await showModal('Enter a name for the trader.', false, 'Missing Name');
+                nameEl.focus();
+                return;
+            }
             if (traderEditingId) {
                 const t = state.traders.find(x => x.id === traderEditingId);
                 if (t) Object.assign(t, { name, phone });
@@ -883,10 +913,12 @@
             if (!t) return;
             const refs = state.entries.filter(e => e.trader === id).length;
             if (refs > 0) {
-                alert(`Trader "${t.name}" is referenced in cashbook entries and cannot be deleted.`);
+                await showModal(`Trader "${t.name}" is referenced in cashbook entries and cannot be deleted.`, false, 'Cannot Delete');
                 return;
             }
-            if (!confirm(`Delete trader "${t.name}"?`)) return;
+            const confirmed = await showModal(`Delete trader "${t.name}"?`, true, 'Confirm Deletion');
+            if (!confirmed) return;
+
             state.traders = state.traders.filter(x => x.id !== id);
             await window.storage.set(STORAGE_KEY, JSON.stringify(state));
             renderTraders();
@@ -903,7 +935,11 @@
             if (!nameEl) return;
             const name = (nameEl.value || '').trim();
             const phone = phoneEl ? (phoneEl.value || '').trim() : '';
-            if (!name) { alert('Enter a worker name.'); nameEl.focus(); return; }
+            if (!name) {
+                await showModal('Enter a worker name.', false, 'Missing Name');
+                nameEl.focus();
+                return;
+            }
             if (laborEditingId) {
                 const l = state.labor.find(x => x.id === laborEditingId);
                 if (l) Object.assign(l, { name, phone });
@@ -960,10 +996,12 @@
             if (!l) return;
             const refs = state.entries.filter(e => e.trader === id).length;
             if (refs > 0) {
-                alert(`Labor worker "${l.name}" is referenced in your cashbook and cannot be deleted.`);
+                await showModal(`Labor worker "${l.name}" is referenced in your cashbook and cannot be deleted.`, false, 'Cannot Delete');
                 return;
             }
-            if (!confirm(`Delete worker "${l.name}"?`)) return;
+            const confirmed = await showModal(`Delete worker "${l.name}"?`, true, 'Confirm Deletion');
+            if (!confirmed) return;
+
             state.labor = state.labor.filter(x => x.id !== id);
             await window.storage.set(STORAGE_KEY, JSON.stringify(state));
             renderLabor();
@@ -999,6 +1037,11 @@
                     opt.value = t.id; opt.textContent = t.name + (t.phone ? (' — ' + t.phone) : '');
                     sel.appendChild(opt);
                 });
+            }
+
+            // Check if only the default "— none —" option exists
+            if (sel.options.length <= 1) {
+                none.textContent = `— No ${categoryEl.value === "Labor Wages" ? "workers" : "traders"} available —`;
             }
         }
 
@@ -1048,17 +1091,17 @@
             filteredEntries.forEach(e => {
                 const tr = document.createElement('tr');
                 tr.innerHTML = `
-                <td>${e.date}</td>
-                <td>${escapeHtml(e.description || '')}</td>
-                <td>${escapeHtml(getTraderOrLaborName(e.trader))}</td>
-                <td><span class="cat-tag">${escapeHtml(e.category)}</span></td>
-                <td class="num in">${e.type === 'in' ? fmt(e.amount) : ''}</td>
-                <td class="num out">${e.type === 'out' ? fmt(e.amount) : ''}</td>
-                <td class="num bal ${e.balance < 0 ? 'negative' : ''}">${fmt(e.balance)}</td>
-                <td class="row-actions">
-                  <button data-edit="${e.id}">Edit</button>
-                  <button data-del="${e.id}">Delete</button>
-                </td>`;
+                    <td>${e.date}</td>
+                    <td>${escapeHtml(e.description || '')}</td>
+                    <td>${escapeHtml(getTraderOrLaborName(e.trader))}</td>
+                    <td><span class="cat-tag">${escapeHtml(e.category)}</span></td>
+                    <td class="num in">${e.type === 'in' ? fmt(e.amount) : ''}</td>
+                    <td class="num out">${e.type === 'out' ? fmt(e.amount) : ''}</td>
+                    <td class="num bal ${e.balance < 0 ? 'negative' : ''}">${fmt(e.balance)}</td>
+                    <td class="row-actions">
+                      <button data-edit="${e.id}">Edit</button>
+                      <button data-del="${e.id}">Delete</button>
+                    </td>`;
                 body.appendChild(tr);
             });
             body.querySelectorAll('[data-edit]').forEach(b => b.addEventListener('click', () => startEdit(b.dataset.edit)));
@@ -1103,11 +1146,11 @@
                 const li = document.createElement('li');
                 const relationshipName = getTraderOrLaborName(e.trader);
                 li.innerHTML = `
-              <div>
-                <div class="desc">${escapeHtml(e.description || e.category)}</div>
-                <div class="meta">${e.date} · ${escapeHtml(e.category)}${relationshipName ? (' · ' + escapeHtml(relationshipName)) : ''}</div>
-              </div>
-              <div class="amt ${e.type}">${e.type === 'in' ? '+' : '−'}${fmt(e.amount)}</div>`;
+                  <div>
+                    <div class="desc">${escapeHtml(e.description || e.category)}</div>
+                    <div class="meta">${e.date} · ${escapeHtml(e.category)}${relationshipName ? (' · ' + escapeHtml(relationshipName)) : ''}</div>
+                  </div>
+                  <div class="amt ${e.type}">${e.type === 'in' ? '+' : '−'}${fmt(e.amount)}</div>`;
                 list.appendChild(li);
             });
         }
@@ -1160,15 +1203,22 @@
 
             updateTypeButtons();
             populateCategorySelect();
-            // Set the value directly to check against category condition
+
+            // Explicitly enforce option selection AFTER DOM population
             document.getElementById('f-category').value = e.category;
+
+            // Dynamic execution to switch context between Trader and Labor Worker view
             populateTraderSelect();
 
             document.getElementById('f-date').value = e.date;
             document.getElementById('f-desc').value = e.description || '';
-            document.getElementById('f-trader').value = e.trader || '';
             document.getElementById('f-amount').value = e.amount;
             document.getElementById('f-notes').value = e.notes || '';
+
+            // Ensure the drop-down matches the edited ledger record id
+            if (document.getElementById('f-trader')) {
+                document.getElementById('f-trader').value = e.trader || '';
+            }
 
             document.getElementById('save-entry').textContent = 'Save changes';
             document.getElementById('cancel-edit').style.display = 'inline-block';
@@ -1195,6 +1245,9 @@
         }
 
         async function deleteEntry(id) {
+            const confirmed = await showModal("Are you sure you want to permanently delete this cashbook entry?", true, "Confirm Deletion");
+            if (!confirmed) return;
+
             state.entries = state.entries.filter(e => e.id !== id);
             await window.storage.set(STORAGE_KEY, JSON.stringify(state));
             render();
@@ -1239,11 +1292,20 @@
             const notes = document.getElementById('f-notes').value.trim();
             const trader = document.getElementById('f-trader').value || '';
 
+            // 1. Validate Amount
             if (!amount || amount <= 0) {
-                alert('Enter an amount greater than 0.');
+                await showModal('Enter an amount greater than 0.', false, 'Invalid Amount');
                 return;
             }
 
+            // 2. Validate that either Description OR Trader/Labor is provided
+            if (!desc && !trader) {
+                const entityLabel = (category === "Labor Wages") ? "a labor worker" : "a trader";
+                await showModal(`Please provide either a Description or select ${entityLabel}.`, false, 'Missing Information');
+                return;
+            }
+
+            // ... rest of the saving code remains exactly the same ...
             const openingVal = parseFloat(document.getElementById('opening-input').value);
             state.openingBalance = isNaN(openingVal) ? 0 : openingVal;
 
@@ -1287,8 +1349,10 @@
 
         // Replace your filter button click logic with this:
         document.querySelectorAll('.filter-btn').forEach(btn => {
-            btn.addEventListener('click', () => {
-                // Scopes the removal strictly to sibling filter buttons
+            btn.addEventListener('click', (e) => {
+                // Stop bubbling so it doesn't cross-contaminate form states
+                e.stopPropagation();
+
                 document.querySelectorAll('.filter-btn').forEach(b => b.classList.remove('selected'));
                 btn.classList.add('selected');
 
@@ -1366,5 +1430,17 @@
         }
         init();
     </script>
+
+    <!-- Custom Elegant Modal Popup -->
+    <div id="custom-modal" style="display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(43, 36, 25, 0.4); backdrop-filter: blur(2px); z-index: 10000; align-items: center; justify-content: center;">
+        <div style="background: #FFFDF6; border: 2px solid #5B3A20; border-radius: 12px; width: 90%; max-width: 400px; padding: 24px; box-shadow: 0 8px 24px rgba(0,0,0,0.15); font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; text-align: center;">
+            <h3 id="modal-title" style="margin: 0 0 10px; font-family: Georgia, serif; color: #3E2712; font-size: 18px; font-weight: normal;">Notice</h3>
+            <p id="modal-msg" style="margin: 0 0 20px; color: #2B2419; font-size: 14px; line-height: 1.5;"></p>
+            <div style="display: flex; justify-content: center; gap: 12px;">
+                <button id="modal-cancel-btn" class="btn secondary" style="padding: 8px 16px; font-size: 13px; display: none;">Cancel</button>
+                <button id="modal-ok-btn" class="btn" style="padding: 8px 20px; font-size: 13px;">OK</button>
+            </div>
+        </div>
+    </div>
 </body>
 </html>
