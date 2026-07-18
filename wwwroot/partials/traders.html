@@ -1,0 +1,24 @@
+<h2 class="section-title">Manage Traders</h2>
+<div class="entry-form" style="margin-bottom:18px;">
+    <div class="form-grid">
+        <div class="field">
+            <label>Name</label>
+            <input type="text" id="trader-name" placeholder="e.g. Murugan Traders">
+        </div>
+        <div class="field">
+            <label>Phone (optional)</label>
+            <input type="text" id="trader-phone" placeholder="Phone number">
+        </div>
+    </div>
+    <div class="form-actions">
+        <button type="button" class="btn secondary" id="trader-cancel" onclick="cancelEditTrader()" style="display:none;">Cancel</button>
+        <button type="button" class="btn" id="trader-save" onclick="addTrader()">Add trader</button>
+    </div>
+</div>
+
+<div class="table-wrap">
+    <table>
+        <thead><tr><th>Trader</th><th>Phone</th><th style="text-align:right;">Net Balance</th><th></th></tr></thead>
+        <tbody id="traders-body"></tbody>
+    </table>
+</div>

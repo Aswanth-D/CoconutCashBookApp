@@ -1,0 +1,134 @@
+<div class="opening-row">
+    <span>Opening cash balance</span>
+    <input type="number" id="opening-input" step="1" disabled>
+    <button class="ui" id="opening-save">Edit</button>
+</div>
+
+<div class="entry-form">
+    <div class="form-grid">
+        <div class="field">
+            <label>Type</label>
+            <div class="type-toggle">
+                <button type="button" class="sel-in selected" data-type="in">Cash in</button>
+                <button type="button" class="sel-out" data-type="out">Cash out</button>
+            </div>
+        </div>
+        <div class="field">
+            <label>Date <span style="color: var(--rust-dark); font-weight: bold;">*</span></label>
+            <input type="date" id="f-date" required>
+        </div>
+        <div class="field full">
+            <label>Description</label>
+            <input type="text" id="f-desc" placeholder="e.g. Sold 500 coconuts to Murugan Traders">
+        </div>
+        <div class="field">
+            <label>Category</label>
+            <select id="f-category"></select>
+        </div>
+        <div class="field">
+            <label id="trader-field-label">Trader / Labor</label>
+            <select id="f-trader"></select>
+        </div>
+        <div class="field">
+            <label>Payment Status</label>
+            <select id="f-status">
+                <option value="Paid" selected>Paid / Settled</option>
+                <option value="Pending">Pending / Credit</option>
+            </select>
+        </div>
+
+        <!-- Amount & Calculator Block -->
+        <div class="field" style="font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;">
+            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 6px;">
+                <label style="margin: 0; font-weight: 600;">Amount (₹) *</label>
+                <label style="margin: 0; font-size: 13px; color: #5B3A20; cursor: pointer; display: inline-flex; align-items: center; gap: 6px; white-space: nowrap; line-height: 1;">
+                    <input type="checkbox" id="calc-toggle" style="margin: 0; width: auto; height: auto; cursor: pointer;">
+                    <span>🧮 Use Quantity × Rate</span>
+                </label>
+            </div>
+            <input type="number" id="f-amount" step="any" placeholder="0.00" required style="width: 100%;">
+            <div id="calc-fields" style="display: none; flex-wrap: wrap; gap: 12px; margin-top: 8px;">
+                <div style="flex: 1; min-width: 100px;">
+                    <label style="font-size: 12px; color: #5B3A20; margin-bottom: 4px; display: block;">Unit Type</label>
+                    <select id="f-unit" style="width: 100%; padding: 8px;">
+                        <option value="Units">Units (Count)</option>
+                        <option value="Ton">Ton (Weight)</option>
+                    </select>
+                </div>
+                <div style="flex: 1; min-width: 100px;">
+                    <label id="qty-field-label" style="font-size: 12px; color: #5B3A20; margin-bottom: 4px; display: block;">Quantity (Units)</label>
+                    <input type="number" id="f-qty" step="any" placeholder="e.g. 2500" style="width: 100%;">
+                </div>
+                <div id="conversion-box" style="flex: 1; min-width: 100px; display: none;">
+                    <label style="font-size: 12px; color: #5B3A20; margin-bottom: 4px; display: block;">Approx Units / Ton</label>
+                    <input type="number" id="f-conv" step="1" placeholder="e.g. 1000" style="width: 100%;">
+                </div>
+                <div style="flex: 1; min-width: 100px;">
+                    <label id="rate-field-label" style="font-size: 12px; color: #5B3A20; margin-bottom: 4px; display: block;">Rate per unit (₹)</label>
+                    <input type="number" id="f-rate" step="any" placeholder="e.g. 15" style="width: 100%;">
+                </div>
+            </div>
+        </div>
+        <div class="field full">
+            <label>Notes (optional)</label>
+            <input type="text" id="f-notes" placeholder="Any extra detail">
+        </div>
+    </div>
+    <div class="form-actions">
+        <button class="btn secondary" id="cancel-edit" style="display:none;">Cancel</button>
+        <button class="btn" id="save-entry">Add entry</button>
+    </div>
+</div>
+
+<!-- Advanced Date Filters and Actions Row -->
+<div style="background: var(--card); border: 1px solid var(--line); border-radius: 10px; padding: 14px; margin-bottom: 14px; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;">
+    <div style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 12px;">
+        <!-- Filter Block Left -->
+        <div style="display: flex; flex-direction: column; gap: 8px; min-width: 320px;">
+            <div style="display: flex; gap: 6px;" class="filter-toggle">
+                <button type="button" class="filter-btn selected" data-filter="all">All Cash</button>
+                <button type="button" class="filter-btn" data-filter="in">Cash In</button>
+                <button type="button" class="filter-btn" data-filter="out">Cash Out</button>
+            </div>
+
+            <div style="display: flex; gap: 4px; flex-wrap: wrap;" class="date-filter-toggle">
+                <button type="button" class="date-btn selected" data-date-range="all">All Dates</button>
+                <button type="button" class="date-btn" data-date-range="today">Today</button>
+                <button type="button" class="date-btn" data-date-range="month">This Month</button>
+                <button type="button" class="date-btn" data-date-range="lastmonth">Last Month</button>
+                <button type="button" class="date-btn" data-date-range="custom">Custom Range</button>
+            </div>
+
+            <div id="custom-date-container" style="display: none; align-items: center; gap: 6px; margin-top: 4px;">
+                <input type="date" id="filter-start-date" style="padding: 6px; border: 1px solid var(--line); border-radius: 4px; font-size:12px;">
+                <span style="font-size: 12px; color: var(--ink-soft);">to</span>
+                <input type="date" id="filter-end-date" style="padding: 6px; border: 1px solid var(--line); border-radius: 4px; font-size:12px;">
+            </div>
+        </div>
+
+        <!-- Action Block Right -->
+        <div style="display: flex; gap: 8px;">
+            <button type="button" class="btn secondary" style="padding: 8px 14px; font-size: 12.5px;" onclick="exportToWhatsApp()">📋 Copy for WhatsApp</button>
+            <button type="button" class="btn secondary" style="padding: 8px 14px; font-size: 12.5px;" onclick="downloadCSV()">💾 Download CSV</button>
+        </div>
+    </div>
+</div>
+
+<div class="table-wrap">
+    <table>
+        <thead>
+            <tr>
+                <th>Date</th>
+                <th>Description</th>
+                <th>Trader / Labor</th>
+                <th>Category</th>
+                <th>Status</th>
+                <th style="text-align:right;">In</th>
+                <th style="text-align:right;">Out</th>
+                <th style="text-align:right;">Balance</th>
+                <th></th>
+            </tr>
+        </thead>
+        <tbody id="entries-body"></tbody>
+    </table>
+</div>

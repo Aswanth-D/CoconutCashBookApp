@@ -535,345 +535,22 @@
 
         <main>
             <!-- DASHBOARD -->
-            <div class="view active" id="view-dashboard">
-                <div class="kpis">
-                    <div class="kpi balance">
-                        <div class="label">Current cash balance</div>
-                        <div class="value" id="kpi-balance">₹0</div>
-                    </div>
-                    <div class="kpi in">
-                        <div class="label">Total cash in</div>
-                        <div class="value" id="kpi-in">₹0</div>
-                    </div>
-                    <div class="kpi out">
-                        <div class="label">Total cash out</div>
-                        <div class="value" id="kpi-out">₹0</div>
-                    </div>
-                    <div class="kpi">
-                        <div class="label">This month, net</div>
-                        <div class="value" id="kpi-month-net">₹0</div>
-                    </div>
-                </div>
-
-                <h2 class="section-title">Recent entries</h2>
-                <ul class="recent-list" id="recent-list"></ul>
-            </div>
+            <div class="view active" id="view-dashboard" data-partial="./partials/dashboard.html"></div>
 
             <!-- INVENTORY / STOCK LEDGER -->
-            <div class="view" id="view-inventory">
-                <h2 class="section-title">Stock Status Balance Summary</h2>
-                <div class="kpis" id="stock-kpis" style="margin-bottom: 26px;"></div>
-
-                <!-- UNIFIED BATCH ENTRY FORM -->
-                <h2 class="section-title">Log Coconut Processing Batch</h2>
-                <div class="entry-form" style="margin-bottom: 22px;">
-                    <div class="form-grid">
-                        <div class="field">
-                            <label>Date *</label>
-                            <input type="date" id="stk-date" required>
-                        </div>
-                        <div class="field">
-                            <label>Raw Coconuts Used (Reduction) *</label>
-                            <input type="number" id="stk-input-coconuts" placeholder="e.g. 3300" required>
-                        </div>
-                        <div class="field">
-                            <label>Copra Produced (KG Addition)</label>
-                            <input type="number" id="stk-out-copra" placeholder="e.g. 300">
-                        </div>
-                        <div class="field">
-                            <label>Husk/Shell Produced (Units Addition)</label>
-                            <input type="number" id="stk-out-husk" placeholder="e.g. 3300">
-                        </div>
-                        <div class="field full">
-                            <label>Batch Description / Notes</label>
-                            <input type="text" id="stk-desc" placeholder="e.g. Lot 4 drying processing run">
-                        </div>
-                    </div>
-                    <div class="form-actions">
-                        <button type="button" class="btn" onclick="saveProcessingBatch()">Log Production Batch</button>
-                    </div>
-                </div>
-
-                <h2 class="section-title">Stock Movement Log</h2>
-                <div class="table-wrap">
-                    <table>
-                        <thead>
-                            <tr>
-                                <th>Date</th>
-                                <th>Category Item</th>
-                                <th>Movement Type</th>
-                                <th style="text-align:right;">Quantity</th>
-                                <th style="text-align:right;">Avg Rate</th>
-                                <th>Associated Party / Notes</th>
-                            </tr>
-                        </thead>
-                        <tbody id="inventory-body"></tbody>
-                    </table>
-                </div>
-            </div>
+            <div class="view" id="view-inventory" data-partial="./partials/inventory.html"></div>
 
             <!-- TRADERS -->
-            <div class="view" id="view-traders">
-                <h2 class="section-title">Manage Traders</h2>
-                <div class="entry-form" style="margin-bottom:18px;">
-                    <div class="form-grid">
-                        <div class="field">
-                            <label>Name</label>
-                            <input type="text" id="trader-name" placeholder="e.g. Murugan Traders">
-                        </div>
-                        <div class="field">
-                            <label>Phone (optional)</label>
-                            <input type="text" id="trader-phone" placeholder="Phone number">
-                        </div>
-                    </div>
-                    <div class="form-actions">
-                        <button type="button" class="btn secondary" id="trader-cancel" onclick="cancelEditTrader()" style="display:none;">Cancel</button>
-                        <button type="button" class="btn" id="trader-save" onclick="addTrader()">Add trader</button>
-                    </div>
-                </div>
-
-                <div class="table-wrap">
-                    <table>
-                        <thead><tr><th>Trader</th><th>Phone</th><th style="text-align:right;">Net Balance</th><th></th></tr></thead>
-                        <tbody id="traders-body"></tbody>
-                    </table>
-                </div>
-            </div>
+            <div class="view" id="view-traders" data-partial="./partials/traders.html"></div>
 
             <!-- LABOR -->
-            <div class="view" id="view-labor">
-                <h2 class="section-title">Manage Labor</h2>
-                <div class="entry-form" style="margin-bottom:18px;">
-                    <div class="form-grid">
-                        <div class="field">
-                            <label>Labor Worker Name</label>
-                            <input type="text" id="labor-name" placeholder="e.g. Ramesh Kumar">
-                        </div>
-                        <div class="field">
-                            <label>Phone (optional)</label>
-                            <input type="text" id="labor-phone" placeholder="Phone number">
-                        </div>
-                    </div>
-                    <div class="form-actions">
-                        <button type="button" class="btn secondary" id="labor-cancel" onclick="cancelEditLabor()" style="display:none;">Cancel</button>
-                        <button type="button" class="btn" id="labor-save" onclick="addLabor()">Add worker</button>
-                    </div>
-                </div>
-
-                <div class="table-wrap">
-                    <table>
-                        <thead><tr><th>Worker Name</th><th>Phone</th><th style="text-align:right;">Net Paid / Owed</th><th></th></tr></thead>
-                        <tbody id="labor-body"></tbody>
-                    </table>
-                </div>
-            </div>
+            <div class="view" id="view-labor" data-partial="./partials/labor.html"></div>
 
             <!-- CASH BOOK -->
-            <div class="view" id="view-cashbook">
-                <div class="opening-row">
-                    <span>Opening cash balance</span>
-                    <input type="number" id="opening-input" step="1" disabled>
-                    <button class="ui" id="opening-save">Edit</button>
-                </div>
-
-                <div class="entry-form">
-                    <div class="form-grid">
-                        <div class="field">
-                            <label>Type</label>
-                            <div class="type-toggle">
-                                <button type="button" class="sel-in selected" data-type="in">Cash in</button>
-                                <button type="button" class="sel-out" data-type="out">Cash out</button>
-                            </div>
-                        </div>
-                        <div class="field">
-                            <label>Date <span style="color: var(--rust-dark); font-weight: bold;">*</span></label>
-                            <input type="date" id="f-date" required>
-                        </div>
-                        <div class="field full">
-                            <label>Description</label>
-                            <input type="text" id="f-desc" placeholder="e.g. Sold 500 coconuts to Murugan Traders">
-                        </div>
-                        <div class="field">
-                            <label>Category</label>
-                            <select id="f-category"></select>
-                        </div>
-                        <div class="field">
-                            <label id="trader-field-label">Trader / Labor</label>
-                            <select id="f-trader"></select>
-                        </div>
-                        <div class="field">
-                            <label>Payment Status</label>
-                            <select id="f-status">
-                                <option value="Paid" selected>Paid / Settled</option>
-                                <option value="Pending">Pending / Credit</option>
-                            </select>
-                        </div>
-
-                        <!-- Amount & Calculator Block -->
-                        <div class="field" style="font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;">
-                            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 6px;">
-                                <label style="margin: 0; font-weight: 600;">Amount (₹) *</label>
-                                <label style="margin: 0; font-size: 13px; color: #5B3A20; cursor: pointer; display: inline-flex; align-items: center; gap: 6px; white-space: nowrap; line-height: 1;">
-                                    <input type="checkbox" id="calc-toggle" style="margin: 0; width: auto; height: auto; cursor: pointer;">
-                                    <span>🧮 Use Quantity × Rate</span>
-                                </label>
-                            </div>
-                            <input type="number" id="f-amount" step="any" placeholder="0.00" required style="width: 100%;">
-                            <div id="calc-fields" style="display: none; flex-wrap: wrap; gap: 12px; margin-top: 8px;">
-                                <div style="flex: 1; min-width: 100px;">
-                                    <label style="font-size: 12px; color: #5B3A20; margin-bottom: 4px; display: block;">Unit Type</label>
-                                    <select id="f-unit" style="width: 100%; padding: 8px;">
-                                        <option value="Units">Units (Count)</option>
-                                        <option value="Ton">Ton (Weight)</option>
-                                    </select>
-                                </div>
-                                <div style="flex: 1; min-width: 100px;">
-                                    <label id="qty-field-label" style="font-size: 12px; color: #5B3A20; margin-bottom: 4px; display: block;">Quantity (Units)</label>
-                                    <input type="number" id="f-qty" step="any" placeholder="e.g. 2500" style="width: 100%;">
-                                </div>
-                                <div id="conversion-box" style="flex: 1; min-width: 100px; display: none;">
-                                    <label style="font-size: 12px; color: #5B3A20; margin-bottom: 4px; display: block;">Approx Units / Ton</label>
-                                    <input type="number" id="f-conv" step="1" placeholder="e.g. 1000" style="width: 100%;">
-                                </div>
-                                <div style="flex: 1; min-width: 100px;">
-                                    <label id="rate-field-label" style="font-size: 12px; color: #5B3A20; margin-bottom: 4px; display: block;">Rate per unit (₹)</label>
-                                    <input type="number" id="f-rate" step="any" placeholder="e.g. 15" style="width: 100%;">
-                                </div>
-                            </div>
-                        </div>
-                        <div class="field full">
-                            <label>Notes (optional)</label>
-                            <input type="text" id="f-notes" placeholder="Any extra detail">
-                        </div>
-                    </div>
-                    <div class="form-actions">
-                        <button class="btn secondary" id="cancel-edit" style="display:none;">Cancel</button>
-                        <button class="btn" id="save-entry">Add entry</button>
-                    </div>
-                </div>
-
-                <!-- Advanced Date Filters and Actions Row -->
-                <div style="background: var(--card); border: 1px solid var(--line); border-radius: 10px; padding: 14px; margin-bottom: 14px; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;">
-                    <div style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 12px;">
-                        <!-- Filter Block Left -->
-                        <div style="display: flex; flex-direction: column; gap: 8px; min-width: 320px;">
-                            <div style="display: flex; gap: 6px;" class="filter-toggle">
-                                <button type="button" class="filter-btn selected" data-filter="all">All Cash</button>
-                                <button type="button" class="filter-btn" data-filter="in">Cash In</button>
-                                <button type="button" class="filter-btn" data-filter="out">Cash Out</button>
-                            </div>
-
-                            <div style="display: flex; gap: 4px; flex-wrap: wrap;" class="date-filter-toggle">
-                                <button type="button" class="date-btn selected" data-date-range="all">All Dates</button>
-                                <button type="button" class="date-btn" data-date-range="today">Today</button>
-                                <button type="button" class="date-btn" data-date-range="month">This Month</button>
-                                <button type="button" class="date-btn" data-date-range="lastmonth">Last Month</button>
-                                <button type="button" class="date-btn" data-date-range="custom">Custom Range</button>
-                            </div>
-
-                            <div id="custom-date-container" style="display: none; align-items: center; gap: 6px; margin-top: 4px;">
-                                <input type="date" id="filter-start-date" style="padding: 6px; border: 1px solid var(--line); border-radius: 4px; font-size:12px;">
-                                <span style="font-size: 12px; color: var(--ink-soft);">to</span>
-                                <input type="date" id="filter-end-date" style="padding: 6px; border: 1px solid var(--line); border-radius: 4px; font-size:12px;">
-                            </div>
-                        </div>
-
-                        <!-- Action Block Right -->
-                        <div style="display: flex; gap: 8px;">
-                            <button type="button" class="btn secondary" style="padding: 8px 14px; font-size: 12.5px;" onclick="exportToWhatsApp()">📋 Copy for WhatsApp</button>
-                            <button type="button" class="btn secondary" style="padding: 8px 14px; font-size: 12.5px;" onclick="downloadCSV()">💾 Download CSV</button>
-                        </div>
-                    </div>
-                </div>
-
-                <div class="table-wrap">
-                    <table>
-                        <thead>
-                            <tr>
-                                <th>Date</th>
-                                <th>Description</th>
-                                <th>Trader / Labor</th>
-                                <th>Category</th>
-                                <th>Status</th>
-                                <th style="text-align:right;">In</th>
-                                <th style="text-align:right;">Out</th>
-                                <th style="text-align:right;">Balance</th>
-                                <th></th>
-                            </tr>
-                        </thead>
-                        <tbody id="entries-body"></tbody>
-                    </table>
-                </div>
-            </div>
+            <div class="view" id="view-cashbook" data-partial="./partials/cashbook.html"></div>
 
             <!-- SUMMARY -->
-            <div class="view" id="view-summary">
-                <h2 class="section-title">Monthly summary</h2>
-                <div class="table-wrap" style="margin-bottom:26px;">
-                    <table>
-                        <thead><tr><th>Month</th><th style="text-align:right;">Cash in</th><th style="text-align:right;">Cash out</th><th style="text-align:right;">Net</th></tr></thead>
-                        <tbody id="monthly-body"></tbody>
-                    </table>
-                </div>
-
-                <h2 class="section-title">Category summary</h2>
-                <div class="summary-grid">
-                    <div class="table-wrap">
-                        <table>
-                            <thead><tr><th>Summary In</th><th style="text-align:right;">Total</th></tr></thead>
-                            <tbody id="cat-in-body"></tbody>
-                        </table>
-                    </div>
-                    <div class="table-wrap">
-                        <table>
-                            <thead><tr><th>Summary Out</th><th style="text-align:right;">Total</th></tr></thead>
-                            <tbody id="cat-out-body"></tbody>
-                        </table>
-                    </div>
-                </div>
-
-                <!-- PROFITABILITY ANALYTICS ENGINE -->
-                <h2 class="section-title" style="margin-top: 26px;">📈 Profitability Analytics Engine</h2>
-                <div class="kpis" id="analytics-kpis" style="margin-bottom: 22px;"></div>
-                <div class="table-wrap" style="margin-bottom: 26px;">
-                    <table>
-                        <thead>
-                            <tr>
-                                <th>Commodity Stream</th>
-                                <th style="text-align:right;">Total Revenue (In)</th>
-                                <th style="text-align:right;">Production Costs (Out)</th>
-                                <th style="text-align:right;">Net Margin</th>
-                                <th style="text-align:right;">Profitability Index</th>
-                            </tr>
-                        </thead>
-                        <tbody id="analytics-body"></tbody>
-                    </table>
-                </div>
-
-                <!-- DANGER ZONE: RESET SYSTEM WITH SECURITY LOCK -->
-                <hr style="border: 0; border-top: 1px solid var(--line); margin: 40px 0 20px;">
-                <div style="background: #fff5f5; border: 1px solid #fabdbd; border-radius: 10px; padding: 20px; text-align: center; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;">
-                    <h3 style="margin: 0 0 6px; color: var(--rust-dark); font-size: 16px;">Danger Zone</h3>
-                    <p style="margin: 0 0 14px; color: var(--ink-soft); font-size: 13px;">
-                        This will permanently erase all cashbook transactions, labor logs, traders, and stock history from the cloud and this browser.
-                    </p>
-
-                    <!-- Security Text Lock -->
-                    <div style="margin-bottom: 14px;">
-                        <label style="display: block; font-size: 12px; font-weight: bold; color: var(--rust-dark); margin-bottom: 6px;">
-                            Type <span style="background:#ffe3e3; padding: 2px 6px; border-radius:4px;">RESET</span> below to unlock the purge button:
-                        </label>
-                        <input type="text" id="purge-lock-input" oninput="checkPurgeLock()" placeholder="Type RESET here"
-                               style="width: 100%; max-width: 240px; text-align: center; border: 1px solid #fabdbd; border-radius: 6px; padding: 6px; font-weight: bold; text-transform: uppercase;">
-                    </div>
-
-                    <button type="button" id="purge-data-btn" class="btn" disabled
-                            style="background: #cbd5e1; border-color: #94a3b8; color: #64748b; cursor: not-allowed;"
-                            onclick="completelyResetAllData()">
-                        Wipe All Data
-                    </button>
-                </div>
-            </div>
+            <div class="view" id="view-summary" data-partial="./partials/summary.html"></div>
 
             <p class="save-note" id="save-note">Connecting to cloud database...</p>
         </main>
@@ -1845,8 +1522,129 @@
             }
         }
 
-        document.getElementById('f-unit').addEventListener('change', triggerUnitLabelUpdate);
-        document.getElementById('cancel-edit').addEventListener('click', cancelEdit);
+        document.addEventListener('change', async (event) => {
+            if (event.target && event.target.id === 'f-unit') {
+                triggerUnitLabelUpdate();
+            }
+            if (event.target && event.target.id === 'f-category') {
+                populateTraderSelect();
+            }
+            if (event.target && event.target.id === 'calc-toggle') {
+                const calcFields = document.getElementById('calc-fields');
+                const amountInput = document.getElementById('f-amount');
+                if (e.target.checked) {
+                    calcFields.style.display = 'flex';
+                    amountInput.readOnly = true;
+                    amountInput.style.background = '#f4f1ea';
+                    suggestLastRate();
+                } else {
+                    calcFields.style.display = 'none';
+                    amountInput.readOnly = false;
+                    amountInput.style.background = '';
+                    document.getElementById('f-qty').value = '';
+                    document.getElementById('f-rate').value = '';
+                }
+            }
+            if (event.target && (event.target.id === 'filter-start-date' || event.target.id === 'filter-end-date')) {
+                renderCashBook();
+            }
+        });
+
+        document.addEventListener('input', async (event) => {
+            if (event.target && (event.target.id === 'f-qty' || event.target.id === 'f-rate')) {
+                const qty = parseFloat(document.getElementById('f-qty').value) || 0;
+                const rate = parseFloat(document.getElementById('f-rate').value) || 0;
+                const total = qty * rate;
+                document.getElementById('f-amount').value = total > 0 ? total.toFixed(2) : '';
+            }
+        });
+
+        document.addEventListener('click', async (event) => {
+            if (event.target && event.target.id === 'cancel-edit') {
+                cancelEdit();
+            }
+            if (event.target && event.target.id === 'save-entry') {
+                const dateInputEl = document.getElementById('f-date');
+                const date = dateInputEl ? dateInputEl.value : '';
+
+                if (!date) {
+                    await showModal('Please select a valid date for the entry.', false, 'Missing Date');
+                    return;
+                }
+
+                const desc = document.getElementById('f-desc').value.trim();
+                const category = document.getElementById('f-category').value;
+                const status = document.getElementById('f-status').value;
+                const amount = parseFloat(document.getElementById('f-amount').value);
+                const notes = document.getElementById('f-notes').value.trim();
+                const trader = document.getElementById('f-trader').value || '';
+                const isCalcActive = document.getElementById('calc-toggle').checked;
+
+                const unit = isCalcActive ? document.getElementById('f-unit').value : 'Units';
+                const qty = isCalcActive ? parseFloat(document.getElementById('f-qty').value) || 0 : null;
+                const rate = isCalcActive ? parseFloat(document.getElementById('f-rate').value) || 0 : null;
+                const convFactor = isCalcActive ? parseInt(document.getElementById('f-conv').value) || 0 : 0;
+
+                let stockQty = 0;
+                if (isCalcActive && qty > 0) {
+                    if (unit === 'Ton') {
+                        stockQty = convFactor > 0 ? Math.round(qty * convFactor) : 0;
+                    } else {
+                        stockQty = Math.round(qty);
+                    }
+                } else if (!isCalcActive) {
+                    const inlineMatches = desc.match(/\b\d+\b/);
+                    if (inlineMatches) stockQty = parseInt(inlineMatches[0], 10);
+                }
+
+                if (!amount || amount <= 0) {
+                    await showModal('Enter an amount greater than 0.', false, 'Invalid Amount');
+                    return;
+                }
+                if (!desc && !trader) {
+                    await showModal(`Please provide either a Description or select a stakeholder party.`, false, 'Missing Information');
+                    return;
+                }
+
+                if (isCalcActive && stockQty <= 0) {
+                    await showModal('Please specify a valid quantity greater than 0 to correctly update the Stock Ledger.', false, 'Invalid Quantity');
+                    return;
+                }
+
+                const openingVal = parseFloat(document.getElementById('opening-input').value);
+                state.openingBalance = isNaN(openingVal) ? 0 : openingVal;
+
+                if (editingId) {
+                    const e = state.entries.find(x => x.id === editingId);
+                    Object.assign(e, { date, description: desc, category, type: currentType, status, amount, notes, trader, qty, rate, unit, convFactor, stockQty });
+                    editingId = null;
+                } else {
+                    state.entries.push({
+                        id: uid(), _seq: state.entries.length,
+                        date, description: desc, category, type: currentType, status, amount, notes, trader, qty, rate, unit, convFactor, stockQty
+                    });
+                }
+                await window.storage.set(STORAGE_KEY, JSON.stringify(state));
+                clearForm();
+                render();
+            }
+            if (event.target && event.target.id === 'opening-save') {
+                const btn = document.getElementById('opening-save');
+                const input = document.getElementById('opening-input');
+                if (input.disabled) {
+                    input.disabled = false;
+                    input.focus();
+                    btn.textContent = 'Save';
+                } else {
+                    const v = parseFloat(input.value);
+                    state.openingBalance = isNaN(v) ? 0 : v;
+                    input.disabled = true;
+                    btn.textContent = 'Edit';
+                    await window.storage.set(STORAGE_KEY, JSON.stringify(state));
+                    render();
+                }
+            }
+        });
 
         function startEdit(id) {
             const e = state.entries.find(x => x.id === id);
@@ -1946,10 +1744,6 @@
             });
         });
 
-        document.getElementById('f-category').addEventListener('change', () => {
-            populateTraderSelect();
-        });
-
         document.querySelectorAll('.tab-btn').forEach(btn => {
             btn.addEventListener('click', () => {
                 document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
@@ -1962,89 +1756,6 @@
                 if (btn.dataset.view === 'inventory') renderInventoryLedger();
                 if (btn.dataset.view === 'cashbook') populateTraderSelect();
             });
-        });
-
-        document.getElementById('save-entry').addEventListener('click', async () => {
-            const dateInputEl = document.getElementById('f-date');
-            const date = dateInputEl ? dateInputEl.value : '';
-
-            if (!date) {
-                await showModal('Please select a valid date for the entry.', false, 'Missing Date');
-                return;
-            }
-
-            const desc = document.getElementById('f-desc').value.trim();
-            const category = document.getElementById('f-category').value;
-            const status = document.getElementById('f-status').value;
-            const amount = parseFloat(document.getElementById('f-amount').value);
-            const notes = document.getElementById('f-notes').value.trim();
-            const trader = document.getElementById('f-trader').value || '';
-            const isCalcActive = document.getElementById('calc-toggle').checked;
-
-            const unit = isCalcActive ? document.getElementById('f-unit').value : 'Units';
-            const qty = isCalcActive ? parseFloat(document.getElementById('f-qty').value) || 0 : null;
-            const rate = isCalcActive ? parseFloat(document.getElementById('f-rate').value) || 0 : null;
-            const convFactor = isCalcActive ? parseInt(document.getElementById('f-conv').value) || 0 : 0;
-
-            let stockQty = 0;
-            if (isCalcActive && qty > 0) {
-                if (unit === 'Ton') {
-                    stockQty = convFactor > 0 ? Math.round(qty * convFactor) : 0;
-                } else {
-                    stockQty = Math.round(qty);
-                }
-            } else if (!isCalcActive) {
-                const inlineMatches = desc.match(/\b\d+\b/);
-                if (inlineMatches) stockQty = parseInt(inlineMatches[0], 10);
-            }
-
-            if (!amount || amount <= 0) {
-                await showModal('Enter an amount greater than 0.', false, 'Invalid Amount');
-                return;
-            }
-            if (!desc && !trader) {
-                await showModal(`Please provide either a Description or select a stakeholder party.`, false, 'Missing Information');
-                return;
-            }
-
-            if (isCalcActive && stockQty <= 0) {
-                await showModal('Please specify a valid quantity greater than 0 to correctly update the Stock Ledger.', false, 'Invalid Quantity');
-                return;
-            }
-
-            const openingVal = parseFloat(document.getElementById('opening-input').value);
-            state.openingBalance = isNaN(openingVal) ? 0 : openingVal;
-
-            if (editingId) {
-                const e = state.entries.find(x => x.id === editingId);
-                Object.assign(e, { date, description: desc, category, type: currentType, status, amount, notes, trader, qty, rate, unit, convFactor, stockQty });
-                editingId = null;
-            } else {
-                state.entries.push({
-                    id: uid(), _seq: state.entries.length,
-                    date, description: desc, category, type: currentType, status, amount, notes, trader, qty, rate, unit, convFactor, stockQty
-                });
-            }
-            await window.storage.set(STORAGE_KEY, JSON.stringify(state));
-            clearForm();
-            render();
-        });
-
-        document.getElementById('opening-save').addEventListener('click', async () => {
-            const btn = document.getElementById('opening-save');
-            const input = document.getElementById('opening-input');
-            if (input.disabled) {
-                input.disabled = false;
-                input.focus();
-                btn.textContent = 'Save';
-            } else {
-                const v = parseFloat(input.value);
-                state.openingBalance = isNaN(v) ? 0 : v;
-                input.disabled = true;
-                btn.textContent = 'Edit';
-                await window.storage.set(STORAGE_KEY, JSON.stringify(state));
-                render();
-            }
         });
 
         document.querySelectorAll('.filter-btn').forEach(btn => {
@@ -2074,36 +1785,6 @@
             });
         });
 
-        ['filter-start-date', 'filter-end-date'].forEach(id => {
-            document.getElementById(id).addEventListener('change', renderCashBook);
-        });
-
-        document.getElementById('calc-toggle').addEventListener('change', function (e) {
-            const calcFields = document.getElementById('calc-fields');
-            const amountInput = document.getElementById('f-amount');
-            if (e.target.checked) {
-                calcFields.style.display = 'flex';
-                amountInput.readOnly = true;
-                amountInput.style.background = '#f4f1ea';
-                suggestLastRate();
-            } else {
-                calcFields.style.display = 'none';
-                amountInput.readOnly = false;
-                amountInput.style.background = '';
-                document.getElementById('f-qty').value = '';
-                document.getElementById('f-rate').value = '';
-            }
-        });
-
-        ['f-qty', 'f-rate'].forEach(id => {
-            document.getElementById(id).addEventListener('input', () => {
-                const qty = parseFloat(document.getElementById('f-qty').value) || 0;
-                const rate = parseFloat(document.getElementById('f-rate').value) || 0;
-                const total = qty * rate;
-                document.getElementById('f-amount').value = total > 0 ? total.toFixed(2) : '';
-            });
-        });
-
         function suggestLastRate() {
             const currentCategory = document.getElementById('f-category').value;
             if (!currentCategory || !state.entries) return;
@@ -2113,14 +1794,14 @@
             }
         }
 
-        document.getElementById('f-category').addEventListener('change', () => {
-            if (document.getElementById('calc-toggle').checked) {
-                suggestLastRate();
-                const qty = parseFloat(document.getElementById('f-qty').value) || 0;
-                const rate = parseFloat(document.getElementById('f-rate').value) || 0;
-                document.getElementById('f-amount').value = (qty * rate) > 0 ? (qty * rate).toFixed(2) : '';
-            }
-        });
+        // document.getElementById('f-category').addEventListener('change', () => {
+        //     if (document.getElementById('calc-toggle').checked) {
+        //         suggestLastRate();
+        //         const qty = parseFloat(document.getElementById('f-qty').value) || 0;
+        //         const rate = parseFloat(document.getElementById('f-rate').value) || 0;
+        //         document.getElementById('f-amount').value = (qty * rate) > 0 ? (qty * rate).toFixed(2) : '';
+        //     }
+        // });
 
         async function init() {
             document.getElementById('f-date').value = todayStr();
@@ -2178,7 +1859,35 @@
                 }
             }, 10000);
         }
-        init();
+        if (window.__partialsLoaded) { init(); } else { window.addEventListener('partialsLoaded', init); }
+    </script>
+    <script type="module">
+        // Partial loader: fetches partial HTML fragments into their view containers and signals readiness.
+        const parts = [
+            {id: 'view-dashboard', path: './partials/dashboard.html'},
+            {id: 'view-cashbook', path: './partials/cashbook.html'},
+            {id: 'view-inventory', path: './partials/inventory.html'},
+            {id: 'view-traders', path: './partials/traders.html'},
+            {id: 'view-labor', path: './partials/labor.html'},
+            {id: 'view-summary', path: './partials/summary.html'},
+        ];
+
+        for (const p of parts) {
+            try {
+                const el = document.getElementById(p.id);
+                if (!el) continue;
+                if (el.innerHTML && el.innerHTML.trim().length > 0) continue; // already present
+                const res = await fetch(p.path);
+                if (!res.ok) continue;
+                const txt = await res.text();
+                el.innerHTML = txt;
+            } catch (e) {
+                console.error('Failed loading partial', p.path, e);
+            }
+        }
+
+        window.__partialsLoaded = true;
+        window.dispatchEvent(new Event('partialsLoaded'));
     </script>
 </body>
 </html>

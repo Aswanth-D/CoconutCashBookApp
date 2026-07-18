@@ -1,0 +1,24 @@
+<h2 class="section-title">Manage Labor</h2>
+<div class="entry-form" style="margin-bottom:18px;">
+    <div class="form-grid">
+        <div class="field">
+            <label>Labor Worker Name</label>
+            <input type="text" id="labor-name" placeholder="e.g. Ramesh Kumar">
+        </div>
+        <div class="field">
+            <label>Phone (optional)</label>
+            <input type="text" id="labor-phone" placeholder="Phone number">
+        </div>
+    </div>
+    <div class="form-actions">
+        <button type="button" class="btn secondary" id="labor-cancel" onclick="cancelEditLabor()" style="display:none;">Cancel</button>
+        <button type="button" class="btn" id="labor-save" onclick="addLabor()">Add worker</button>
+    </div>
+</div>
+
+<div class="table-wrap">
+    <table>
+        <thead><tr><th>Worker Name</th><th>Phone</th><th style="text-align:right;">Net Paid / Owed</th><th></th></tr></thead>
+        <tbody id="labor-body"></tbody>
+    </table>
+</div>
