@@ -316,11 +316,14 @@
             background: var(--card);
             border: 1px solid var(--line);
             border-radius: 10px;
-            overflow: hidden;
+            overflow-x: auto; /* Enables horizontal scroll on small screens */
+            -webkit-overflow-scrolling: touch; /* Smooth scrolling on iOS */
+            width: 100%;
         }
 
         table {
             width: 100%;
+            min-width: 600px; /* Forces the table to maintain width so it scrolls instead of squishing */
             border-collapse: collapse;
             font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
             font-size: 13px;
@@ -1843,6 +1846,7 @@
         }
 
         document.getElementById('f-unit').addEventListener('change', triggerUnitLabelUpdate);
+        document.getElementById('cancel-edit').addEventListener('click', cancelEdit);
 
         function startEdit(id) {
             const e = state.entries.find(x => x.id === id);
@@ -1882,11 +1886,22 @@
             window.scrollTo({ top: 0, behavior: 'smooth' });
         }
 
-        function cancelEdit() {
+        function cancelEdit(event) {
+            if (event) event.preventDefault(); // Prevents potential form submission interference
+
             editingId = null;
-            document.getElementById('save-entry').textContent = 'Add entry';
-            document.getElementById('cancel-edit').style.display = 'none';
+
+            // Reset UI elements
+            const saveBtn = document.getElementById('save-entry');
+            const cancelBtn = document.getElementById('cancel-edit');
+
+            saveBtn.textContent = 'Add entry';
+            cancelBtn.style.display = 'none';
+
+            // Clear the form
             clearForm();
+
+            console.log("Edit cancelled, form cleared."); // Check your browser console (F12) to see if this logs
         }
 
         function clearForm() {
@@ -1894,16 +1909,19 @@
             document.getElementById('f-desc').value = '';
             document.getElementById('f-status').value = 'Paid';
             document.getElementById('f-amount').value = '';
-            document.getElementById('f-trader').value = '';
             document.getElementById('f-notes').value = '';
+
+            // Explicitly reset dropdowns
+            document.getElementById('f-category').selectedIndex = 0;
+            document.getElementById('f-trader').selectedIndex = 0;
+
+            // Reset calculator UI
             document.getElementById('calc-toggle').checked = false;
             document.getElementById('calc-fields').style.display = 'none';
             document.getElementById('f-amount').readOnly = false;
             document.getElementById('f-amount').style.background = '';
-            document.getElementById('f-qty').value = '';
-            document.getElementById('f-rate').value = '';
-            populateCategorySelect();
-            populateTraderSelect();
+
+            // Attempt to clear drafts
             try { localStorage.removeItem(DRAFT_KEY); } catch (e) { }
         }
 
