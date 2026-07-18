@@ -619,9 +619,30 @@
                             <label id="trader-field-label">Trader / Labor</label>
                             <select id="f-trader"></select>
                         </div>
-                        <div class="field">
-                            <label>Amount (₹)</label>
-                            <input type="number" id="f-amount" min="0" step="1" placeholder="0">
+                        <!-- Amount & Calculator Block -->
+                        <div class="field" style="font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;">
+                            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 6px;">
+                                <label style="margin: 0; font-weight: 600;">Amount (₹) *</label>
+                                <label style="margin: 0; font-size: 13px; color: #5B3A20; cursor: pointer; display: inline-flex; align-items: center; gap: 6px; white-space: nowrap; line-height: 1;">
+                                    <input type="checkbox" id="calc-toggle" style="margin: 0; width: auto; height: auto; cursor: pointer;">
+                                    <span>🧮 Use Quantity × Rate</span>
+                                </label>
+                            </div>
+
+                            <!-- Flat Amount Input (Visible by default) -->
+                            <input type="number" id="f-amount" step="any" placeholder="0.00" required style="width: 100%;">
+
+                            <!-- Dynamic Calculator Inputs (Hidden by default) -->
+                            <div id="calc-fields" style="display: none; gap: 12px; margin-top: 8px;">
+                                <div style="flex: 1;">
+                                    <label style="font-size: 12px; color: #5B3A20; margin-bottom: 4px; display: block;">Quantity (Nos / Kgs / Tons)</label>
+                                    <input type="number" id="f-qty" step="any" placeholder="e.g. 2500" style="width: 100%;">
+                                </div>
+                                <div style="flex: 1;">
+                                    <label style="font-size: 12px; color: #5B3A20; margin-bottom: 4px; display: block;">Rate per unit (₹)</label>
+                                    <input type="number" id="f-rate" step="any" placeholder="e.g. 15" style="width: 100%;">
+                                </div>
+                            </div>
                         </div>
                         <div class="field full">
                             <label>Notes (optional)</label>
@@ -1364,6 +1385,20 @@
                 document.getElementById('f-trader').value = e.trader || '';
             }
 
+            if (e.qty || e.rate) {
+                document.getElementById('calc-toggle').checked = true;
+                document.getElementById('calc-fields').style.display = 'flex';
+                document.getElementById('f-amount').readOnly = true;
+                document.getElementById('f-amount').style.background = '#f4f1ea';
+                document.getElementById('f-qty').value = e.qty || '';
+                document.getElementById('f-rate').value = e.rate || '';
+            } else {
+                document.getElementById('calc-toggle').checked = false;
+                document.getElementById('calc-fields').style.display = 'none';
+                document.getElementById('f-amount').readOnly = false;
+                document.getElementById('f-amount').style.background = '';
+            }
+
             document.getElementById('save-entry').textContent = 'Save changes';
             document.getElementById('cancel-edit').style.display = 'inline-block';
 
@@ -1383,6 +1418,12 @@
             document.getElementById('f-amount').value = '';
             document.getElementById('f-trader').value = '';
             document.getElementById('f-notes').value = '';
+            document.getElementById('calc-toggle').checked = false;
+            document.getElementById('calc-fields').style.display = 'none';
+            document.getElementById('f-amount').readOnly = false;
+            document.getElementById('f-amount').style.background = '';
+            document.getElementById('f-qty').value = '';
+            document.getElementById('f-rate').value = '';
             populateCategorySelect();
             populateTraderSelect();
             try { localStorage.removeItem(DRAFT_KEY); } catch (e) { }
@@ -1435,6 +1476,9 @@
             const amount = parseFloat(document.getElementById('f-amount').value);
             const notes = document.getElementById('f-notes').value.trim();
             const trader = document.getElementById('f-trader').value || '';
+            const isCalcActive = document.getElementById('calc-toggle').checked;
+            const qty = isCalcActive ? parseFloat(document.getElementById('f-qty').value) || 0 : null;
+            const rate = isCalcActive ? parseFloat(document.getElementById('f-rate').value) || 0 : null;
 
             // 1. Validate Amount
             if (!amount || amount <= 0) {
@@ -1462,7 +1506,8 @@
             } else {
                 state.entries.push({
                     id: uid(), _seq: state.entries.length,
-                    date, description: desc, category, type: currentType, amount, notes, trader
+                    date, description: desc, category, type: currentType, amount, notes, trader, qty: qty,
+                    rate: rate
                 });
             }
             await window.storage.set(STORAGE_KEY, JSON.stringify(state));
@@ -1503,6 +1548,65 @@
                 currentFilter = btn.dataset.filter;
                 renderCashBook();
             });
+        });
+
+        // 1. Handle Toggle visibility for the calculator panel
+        document.getElementById('calc-toggle').addEventListener('change', function (e) {
+            const calcFields = document.getElementById('calc-fields');
+            const amountInput = document.getElementById('f-amount');
+
+            if (e.target.checked) {
+                calcFields.style.display = 'flex';
+                amountInput.readOnly = true; // Prevent manual modification when calculator is active
+                amountInput.style.background = '#f4f1ea'; // Subtle look indicating it's computed
+
+                // Auto-suggest the last used rate for the active category
+                suggestLastRate();
+            } else {
+                calcFields.style.display = 'none';
+                amountInput.readOnly = false;
+                amountInput.style.background = '';
+                document.getElementById('f-qty').value = '';
+                document.getElementById('f-rate').value = '';
+            }
+        });
+
+        // 2. Perform live multiplication whenever Quantity or Rate changes
+        ['f-qty', 'f-rate'].forEach(id => {
+            document.getElementById(id).addEventListener('input', () => {
+                const qty = parseFloat(document.getElementById('f-qty').value) || 0;
+                const rate = parseFloat(document.getElementById('f-rate').value) || 0;
+                const total = qty * rate;
+
+                // Update the main amount field seamlessly
+                document.getElementById('f-amount').value = total > 0 ? total.toFixed(2) : '';
+            });
+        });
+
+        // 3. Track daily rate fluctuations by remembering the last custom value per category
+        function suggestLastRate() {
+            const currentCategory = document.getElementById('f-category').value;
+            if (!currentCategory || !state.entries) return;
+
+            // Scan backwards to find the most recent entry with the same category and a recorded rate
+            const lastMatchingEntry = [...state.entries]
+                .reverse()
+                .find(e => e.category === currentCategory && e.rate);
+
+            if (lastMatchingEntry) {
+                document.getElementById('f-rate').value = lastMatchingEntry.rate;
+            }
+        }
+
+        // 4. Update Category change listener to update the suggested rate if the calculator is currently open
+        document.getElementById('f-category').addEventListener('change', () => {
+            if (document.getElementById('calc-toggle').checked) {
+                suggestLastRate();
+                // Trigger calculation updates if quantities exist
+                const qty = parseFloat(document.getElementById('f-qty').value) || 0;
+                const rate = parseFloat(document.getElementById('f-rate').value) || 0;
+                document.getElementById('f-amount').value = (qty * rate) > 0 ? (qty * rate).toFixed(2) : '';
+            }
         });
 
         async function init() {
