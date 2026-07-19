@@ -36,7 +36,9 @@ body {
     /* FIX: Changed display flex to block on mobile containers to prevent Android scaling overflow */
     display: block;
     min-height: 100vh;
+    height: auto !important; /* Prevents rigid viewport locking */
     width: 100%;
+    overflow-y: auto !important; /* Forces normal page flow scrolling engine */
 }
 
 .app {
@@ -111,6 +113,7 @@ main {
     margin-left: 0; /* Clear desktop margin rules to avoid right-edge clipping on mobile viewports */
     flex-grow: 1;
     min-height: calc(100vh - 120px);
+    height: auto !important; /* Lets container expand dynamically with multi-card content */
 }
 
 .view {
@@ -132,6 +135,48 @@ main {
         opacity: 1;
         transform: translateY(0);
     }
+}
+
+/* --- OPTIMIZATION FOR MOBILE / ANDROID APP VIEWPORTS --- */
+@media screen and (max-width: 480px) {
+    /* Reduce vertical padding/margins on titles to save space */
+    .section-title, h2.section-title {
+        font-size: 1.2rem !important;
+        margin: 12px 0 8px 0 !important;
+    }
+
+    /* Convert the KPI container into a compact 2-column grid */
+    .kpis {
+        display: grid !important;
+        grid-template-columns: repeat(2, 1fr) !important;
+        gap: 8px !important;
+        padding: 4px 0 !important;
+        margin-bottom: 24px !important;
+    }
+
+    /* Make individual KPI cards sleeker and less padded */
+    .kpi {
+        border: none !important; /* Clear out rigid box borders */
+        padding: 10px 8px !important;
+        border-radius: 12px !important; /* Premium rounded profiles */
+        margin: 0 !important; /* Prevents block element stack margins */
+        background: #ffffff !important;
+        box-shadow: 0 4px 12px rgba(15, 23, 42, 0.03) !important;
+    }
+
+        /* Shrink text sizing slightly so values don't overflow/wrap uglily */
+        .kpi .label {
+            font-size: 0.75rem !important;
+            letter-spacing: 0.5px !important;
+            margin-bottom: 4px !important;
+            color: #64748b !important;
+        }
+
+        .kpi .value {
+            font-size: 1.1rem !important;
+            font-weight: 800 !important;
+            color: #0f172a !important;
+        }
 }
 
 /* --- HIGH FIDELITY METRICS CARDS --- */
@@ -498,8 +543,10 @@ tbody tr.pending-row {
     body {
         display: block;
         position: relative;
-        overflow-x: hidden; /* Stops horizontal screen shaking during swipes */
+        overflow-x: hidden !important; /* Stops horizontal screen shaking during swipes */
+        overflow-y: auto !important; /* Forces Android framework vertical layout viewports to activate scroll */
         width: 100%;
+        height: auto !important;
     }
 
     .app {
@@ -539,9 +586,14 @@ tbody tr.pending-row {
 
     /* Main container adapts smoothly to dynamic heights */
     main {
-        margin-left: 0;
-        width: 100%;
+        margin-left: 0 !important;
+        width: 100% !important;
         display: block;
+        padding-top: 105px !important; /* Pushes the 'Cash Flow Metrics' title comfortably clear of the top bar */
+        padding-bottom: 120px !important; /* Buffer zone: prevents final metrics from hiding underneath the fixed bottom navigation layout menu bar */
+        background: #f8fafc !important;
+        overflow-y: visible !important; /* Passes touch event behaviors up to document body */
+        height: auto !important;
     }
 }
 
@@ -616,7 +668,7 @@ tbody tr.pending-row {
         font-weight: 600;
         color: var(--ink-soft);
         border-radius: 6px;
-        transition: all 0.15s cubic-bezier(0.4, 0, 0.2, 1);
+        transition: all 0.15 cubic-bezier(0.4, 0, 0.2, 1);
         box-shadow: none;
     }
 
@@ -633,76 +685,41 @@ tbody tr.pending-row {
             box-shadow: 0 1px 3px rgba(15, 23, 42, 0.08), 0 1px 2px rgba(15, 23, 42, 0.04);
         }
 
-/* --- ANDROID INLINE FIXES & SPACING ADJUSTMENTS --- */
+/* --- FIXED ANDROID TOP APP BAR & STATUS OVERLAPS --- */
 @media (max-width: 1024px) {
+
+    /* 1. Force layout visibility and push past camera punch holes */
     .mobile-top-bar {
         display: flex !important;
-        padding-top: 44px !important;
-        height: 88px !important;
-    }
-
-    .mobile-bottom-nav {
-        display: block !important;
-    }
-
-    /* Kite App Layout Overhaul with SVGs */
-    .mobile-quick-tabs .tab-btn, #menuToggleBtn.tab-btn {
-        flex: 1;
-        padding: 6px 0 !important;
-        border: none !important;
-        background: transparent !important;
-        color: var(--ink-soft) !important;
-        display: flex !important;
-        flex-direction: column !important;
         align-items: center !important;
-        justify-content: center !important;
-        cursor: pointer;
-        gap: 4px; /* Space between SVG and the text below it */
-        transition: color 0.15s ease;
+        justify-content: flex-start !important;
+        background: #0f5132 !important; /* Premium Emerald to match your primary brand theme */
+        /* MODIFIED: Increased top padding from 42px to 54px to nudge the text downwards */
+        padding: 54px 16px 20px 16px !important;
+        position: fixed !important;
+        top: 0 !important;
+        left: 0 !important;
+        right: 0 !important;
+        z-index: 9999 !important;
+        box-shadow: 0 2px 10px rgba(15, 23, 42, 0.08) !important;
     }
 
-    /* Target the SVG dimension properties */
-    .mobile-quick-tabs .nav-icon, #menuToggleBtn .nav-icon {
-        width: 20px;
-        height: 20px;
-        stroke: var(--ink-soft);
-        transition: stroke 0.15s ease;
-    }
-
-    .mobile-quick-tabs .nav-label {
-        font-size: 11px !important;
-        font-weight: 500 !important;
-        letter-spacing: 0.2px;
-    }
-
-    /* Kite Active State: Highlighting text and matching SVG stroke colors */
-    .mobile-quick-tabs .tab-btn.active {
-        color: var(--husk) !important;
-    }
-
-        .mobile-quick-tabs .tab-btn.active .nav-icon {
-            stroke: var(--husk) !important;
-        }
-
-    header nav .desk-only {
+    /* 2. Hide desktop navigation elements completely */
+    header {
         display: none !important;
     }
 
-    header {
-        z-index: 1001 !important;
-        padding-top: 56px !important;
-    }
-
-    nav button {
-        padding: 14px 18px !important;
-        font-size: 16px !important;
-        margin-bottom: 6px;
-        width: 100%;
-    }
-
+    /* 3. Main container adapts smoothly to dynamic heights */
     main {
-        padding-top: 104px !important;
-        padding-bottom: 96px !important;
+        margin-left: 0 !important;
+        width: 100% !important;
+        display: block;
+        /* MODIFIED: Adjusted top padding to 125px to prevent the taller header from clipping your metrics cards */
+        padding-top: 125px !important;
+        padding-bottom: 120px !important; /* Buffer zone: prevents final metrics from hiding underneath the fixed bottom navigation layout menu bar */
+        background: #f8fafc !important;
+        overflow-y: visible !important; /* Passes touch event behaviors up to document body */
+        height: auto !important;
     }
 }
 
@@ -763,3 +780,134 @@ button[data-del], button.del-trader, button.del-labor {
     button[data-del]:hover, button.del-trader:hover, button.del-labor:hover {
         background: #fee2e2 !important; /* Soft light red overlay window for deletion */
     }
+
+/* Container Layout */
+.toggle-container {
+    margin-bottom: 20px;
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+    width: 100%;
+}
+
+.toggle-label-text {
+    font-size: 12px;
+    font-weight: 700;
+    color: #546e7a;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+}
+
+/* Full Width Segmented Control Row */
+.segmented-control {
+    display: flex;
+    gap: 12px;
+    width: 100%;
+}
+
+    /* Hide native radio inputs completely */
+    .segmented-control input[type="radio"] {
+        position: absolute;
+        opacity: 0;
+        width: 0;
+        height: 0;
+    }
+
+    /* Shared Default Base Style for Both Unselected Buttons */
+    .segmented-control .segment-btn {
+        flex: 1;
+        text-align: center;
+        padding: 14px 24px;
+        font-size: 15px;
+        font-weight: 600;
+        background-color: #ffffff;
+        color: #37474f;
+        border: 1px solid #cfd8dc;
+        border-radius: 12px;
+        cursor: pointer;
+        transition: all 0.2s ease-in-out;
+        user-select: none;
+        display: block;
+    }
+
+    /* Matches Image: Solid Dark Green Fill with White Text for Checked Buttons */
+    .segmented-control input[type="radio"]:checked + .segment-btn {
+        border-color: #0c4a30; /* Dark Green Border */
+        background-color: #0c4a30; /* Solid Forest Green Background */
+        color: #ffffff; /* Bold White Text */
+        box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
+    }
+
+/* --- PREMIUM MODERN 5-TAB BOTTOM NAVIGATION UI --- */
+@media (max-width: 1024px) {
+    /* Format the main parent navigation bar container wrapper */
+    .mobile-bottom-nav {
+        display: flex !important;
+        background: #ffffff !important;
+        border-top: 1px solid #e2e8f0 !important; /* Soft premium line divider instead of boxes */
+        padding: 8px 8px 22px 8px !important; /* Proper bottom padding safety zone */
+        box-shadow: 0 -4px 14px rgba(15, 23, 42, 0.04) !important;
+    }
+
+    /* Strip all harsh box outlines from the internal list */
+    .mobile-quick-tabs {
+        width: 100% !important;
+        justify-content: space-around !important; /* Spreads tabs out evenly and naturally */
+    }
+
+        /* Redesign button frames to look like native app tabs */
+        .mobile-quick-tabs .tab-btn {
+            flex: 1 !important;
+            background: transparent !important;
+            border: none !important; /* Kills the box grid lines completely */
+            outline: none !important;
+            display: flex !important;
+            flex-direction: column !important;
+            align-items: center !important;
+            justify-content: center !important;
+            padding: 6px 0 !important;
+            margin: 0 !important;
+            color: #64748b !important; /* Muted slate gray for inactive items */
+            transition: all 0.2s ease-in-out !important;
+        }
+
+            /* Make the active screen choice stand out beautifully using premium emerald */
+            .mobile-quick-tabs .tab-btn.active {
+                color: #0f5132 !important; /* Grounded branding dark green */
+                font-weight: 700 !important;
+            }
+
+        /* Style the structural vector graphic icons */
+        .mobile-quick-tabs .nav-icon {
+            width: 22px !important;
+            height: 22px !important;
+            margin-bottom: 4px !important;
+            stroke-width: 2.2 !important; /* Clean, perfectly readable stroke thickness */
+            transition: transform 0.2s ease !important;
+        }
+
+        /* Micro-interaction: subtly raise active icon up */
+        .mobile-quick-tabs .tab-btn.active .nav-icon {
+            transform: translateY(-1px);
+        }
+
+        /* Clean typography settings for text labels underneath icons */
+        .mobile-quick-tabs .nav-label {
+            font-size: 11px !important;
+            font-weight: 500 !important;
+            letter-spacing: 0.1px !important;
+            display: block !important;
+        }
+}
+
+/* Extra safety rule for narrow screens to ensure text labels never overlap */
+@media screen and (max-width: 400px) {
+    .mobile-quick-tabs .nav-label {
+        font-size: 10px !important;
+    }
+
+    .mobile-quick-tabs .nav-icon {
+        width: 20px !important;
+        height: 20px !important;
+    }
+}

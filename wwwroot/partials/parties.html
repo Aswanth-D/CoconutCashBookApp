@@ -1,0 +1,46 @@
+<h2 class="section-title" id="combined-section-title">Manage Traders & Labor</h2>
+
+<!-- Segmented Controller Toggle Interface -->
+<div class="toggle-container">
+    <label class="toggle-label-text">TYPE</label>
+    <div class="segmented-control">
+        <input type="radio" id="toggle-trader" name="entity-type-toggle" value="trader" checked>
+        <label for="toggle-trader" class="segment-btn trader-btn">Traders</label>
+
+        <input type="radio" id="toggle-labor" name="entity-type-toggle" value="labor">
+        <label for="toggle-labor" class="segment-btn labor-btn">Labors</label>
+    </div>
+</div>
+
+<!-- Unified Entry Form Container -->
+<div class="entry-form" style="margin-bottom:18px;">
+    <div class="form-grid">
+        <div class="field">
+            <label id="dynamic-name-label">Trader Name</label>
+            <input type="text" id="entity-name" placeholder="e.g. Murugan Traders">
+        </div>
+        <div class="field">
+            <label>Phone (optional)</label>
+            <input type="text" id="entity-phone" placeholder="Phone number">
+        </div>
+    </div>
+    <div class="form-actions">
+        <button type="button" class="btn secondary" id="entity-cancel" onclick="cancelCombinedEdit()" style="display:none;">Cancel</button>
+        <button type="button" class="btn" id="entity-save" onclick="saveCombinedEntity()">Add Trader</button>
+    </div>
+</div>
+
+<!-- Dynamic Data Table Wrapper -->
+<div class="table-wrap">
+    <table>
+        <thead>
+            <tr id="dynamic-table-headers">
+                <th>Trader Name</th>
+                <th>Phone</th>
+                <th style="text-align:right;">Net Balance</th>
+                <th></th>
+            </tr>
+        </thead>
+        <tbody id="combined-entity-body"></tbody>
+    </table>
+</div>

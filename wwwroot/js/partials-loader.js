@@ -4,8 +4,7 @@
             {id: 'view-dashboard', path: './partials/dashboard.html'},
             {id: 'view-cashbook', path: './partials/cashbook.html'},
             {id: 'view-inventory', path: './partials/stockledger.html'},
-            {id: 'view-traders', path: './partials/traders.html'},
-            {id: 'view-labor', path: './partials/labor.html'},
+            {id: 'view-traders', path: './partials/parties.html'},
             {id: 'view-summary', path: './partials/summary.html'},
         ];
 

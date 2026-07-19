@@ -51,8 +51,8 @@
 
         const DRAFT_KEY = 'coconut-cashbook-draft';
         const CATEGORIES = {
-            in: ["Coconut Sales", "Copra Sales", "Coconut Oil Sales", "Coconut Water Sales", "Husk/Shell Sales", "Advance Received", "Other Income"],
-            out: ["Coconut Purchase", "Labor Wages", "Transport/Freight", "Loading/Unloading", "Storage/Rent", "Electricity/Fuel", "Packing Material", "Maintenance", "Commission/Brokerage", "Loan Repayment", "Other Expense"]
+            in: ["Copra Sales", "Husk/Shell Sales", "Coconut Oil Sales", "Advance Received", "Other Income"],
+            out: ["Coconut Purchase", "Labor Wages", "Transport/Freight", "Loading/Unloading", "Electricity/Fuel", "Commission/Brokerage", "Other Expense"]
         };
 
         let state = { openingBalance: 0, entries: [], traders: [], labor: [], stockAdjustments: [] };
@@ -60,8 +60,8 @@
         let currentFilter = 'all';
         let currentDateRange = 'all';
         let editingId = null;
-        let traderEditingId = null;
-        let laborEditingId = null;
+        let currentViewType = 'trader';
+        let combinedEditingId = null;
 
         function checkPurgeLock() {
             const inputVal = document.getElementById('purge-lock-input').value.trim();
@@ -157,9 +157,10 @@
                 showModal("No entries recorded yet to create a download spreadsheet file.", false, "Export Empty");
                 return;
             }
+        
             let csvRows = [["Date", "Description", "Trader/Labor", "Category", "Payment Status", "Cash In", "Cash Out", "Running Balance", "Notes"]];
             const sorted = computeBalances();
-
+        
             sorted.forEach(e => {
                 csvRows.push([
                     e.date,
@@ -173,15 +174,26 @@
                     `"${(e.notes || '').replace(/"/g, '""')}"`
                 ]);
             });
-
-            let csvContent = "data:text/csv;charset=utf-8," + csvRows.map(r => r.join(",")).join("\n");
-            let encodedUri = encodeURI(csvContent);
+        
+            // 1. Join rows into a clean CSV string framework
+            let csvString = csvRows.map(r => r.join(",")).join("\n");
+        
+            // 2. Wrap it inside a standardized Blob object with proper MIME formatting
+            let blob = new Blob([csvString], { type: 'text/csv;charset=utf-8;' });
+        
+            // 3. Generate a local blob download link (Universal mobile/desktop bypass method)
+            let url = URL.createObjectURL(blob);
             let link = document.createElement("a");
-            link.setAttribute("href", encodedUri);
+        
+            link.setAttribute("href", url);
             link.setAttribute("download", `coconut_cashbook_${new Date().toISOString().slice(0, 10)}.csv`);
+        
             document.body.appendChild(link);
             link.click();
+        
+            // 4. Clean up memory allocations post-execution
             document.body.removeChild(link);
+            setTimeout(() => URL.revokeObjectURL(url), 100);
         }
 
         function fmt(n) {
@@ -241,190 +253,185 @@
             if (prevVal && CATEGORIES[currentType].includes(prevVal)) {
                 sel.value = prevVal;
             }
+}
+
+        // --- Combined Traders & Labor Controller Logic ---
+        function switchCombinedView(type) {
+            currentViewType = type;
+            combinedEditingId = null;
+            
+            const nameLabel = document.getElementById('dynamic-name-label');
+            const nameInput = document.getElementById('entity-name');
+            const saveBtn = document.getElementById('entity-save');
+            const cancelBtn = document.getElementById('entity-cancel');
+            const tableHeaders = document.getElementById('dynamic-table-headers');
+            
+            if (!nameInput) return; // Guard if elements aren't injected into DOM yet
+
+            nameInput.value = '';
+            const phoneEl = document.getElementById('entity-phone');
+            if (phoneEl) phoneEl.value = '';
+            if (cancelBtn) cancelBtn.style.display = 'none';
+
+            if (type === 'trader') {
+                if (nameLabel) nameLabel.textContent = 'Trader Name';
+                nameInput.placeholder = 'e.g. Murugan Traders';
+                if (saveBtn) saveBtn.textContent = 'Add Trader';
+                if (tableHeaders) {
+                    tableHeaders.innerHTML = `<th>Trader Name</th><th>Phone</th><th style="text-align:right;">Net Balance</th><th></th>`;
+                }
+            } else {
+                if (nameLabel) nameLabel.textContent = 'Labor Worker Name';
+                nameInput.placeholder = 'e.g. Ramesh Kumar';
+                if (saveBtn) saveBtn.textContent = 'Add Worker';
+                if (tableHeaders) {
+                    tableHeaders.innerHTML = `<th>Worker Name</th><th>Phone</th><th style="text-align:right;">Net Paid / Owed</th><th></th>`;
+                }
+            }
+            renderCombinedEntities();
         }
 
-        // --- Traders Management ---
-        async function addTrader() {
-            const nameEl = document.getElementById('trader-name');
-            const phoneEl = document.getElementById('trader-phone');
+        async function saveCombinedEntity() {
+            const nameEl = document.getElementById('entity-name');
+            const phoneEl = document.getElementById('entity-phone');
             if (!nameEl) return;
+            
             const name = (nameEl.value || '').trim();
             const phone = phoneEl ? (phoneEl.value || '').trim() : '';
+            
             if (!name) {
-                await showModal('Enter a name for the trader.', false, 'Missing Name');
+                await showModal('Please enter a valid name.', false, 'Missing Name');
                 nameEl.focus();
                 return;
             }
-            if (traderEditingId) {
-                const t = state.traders.find(x => x.id === traderEditingId);
-                if (t) Object.assign(t, { name, phone });
-                traderEditingId = null;
-                document.getElementById('trader-save').textContent = 'Add trader';
-                document.getElementById('trader-cancel').style.display = 'none';
+
+            if (currentViewType === 'trader') {
+                if (combinedEditingId) {
+                    const t = state.traders.find(x => x.id === combinedEditingId);
+                    if (t) Object.assign(t, { name, phone });
+                } else {
+                    state.traders.push({ id: uid(), name, phone });
+                }
             } else {
-                state.traders.push({ id: uid(), name, phone });
+                if (combinedEditingId) {
+                    const l = state.labor.find(x => x.id === combinedEditingId);
+                    if (l) Object.assign(l, { name, phone });
+                } else {
+                    state.labor.push({ id: uid(), name, phone });
+                }
             }
+
+            combinedEditingId = null;
+            document.getElementById('entity-save').textContent = currentViewType === 'trader' ? 'Add Trader' : 'Add Worker';
+            document.getElementById('entity-cancel').style.display = 'none';
+            
             await window.storage.set(STORAGE_KEY, JSON.stringify(state));
             nameEl.value = '';
             if (phoneEl) phoneEl.value = '';
-            renderTraders();
+            
+            renderCombinedEntities();
             populateTraderSelect();
             render();
         }
 
-        function renderTraders() {
-            const body = document.getElementById('traders-body');
+        function renderCombinedEntities() {
+            const body = document.getElementById('combined-entity-body');
             if (!body) return;
             body.innerHTML = '';
-            if (!state.traders || state.traders.length === 0) {
-                body.innerHTML = '<tr><td colspan="4" class="empty-note" style="padding:18px;">No traders yet.</td></tr>';
-                return;
-            }
 
-            state.traders.forEach(t => {
-                const tEntries = state.entries.filter(e => e.trader === t.id);
-                const totalIn = tEntries.filter(e => e.type === 'in').reduce((sum, e) => sum + e.amount, 0);
-                const totalOut = tEntries.filter(e => e.type === 'out').reduce((sum, e) => sum + e.amount, 0);
-                const netBal = totalIn - totalOut;
-                let balColor = netBal > 0 ? '#2e7d32' : (netBal < 0 ? '#c62828' : '#2B2419');
+            if (currentViewType === 'trader') {
+                if (!state.traders || state.traders.length === 0) {
+                    body.innerHTML = '<tr><td colspan="4" class="empty-note" style="padding:18px;">No traders yet.</td></tr>';
+                    return;
+                }
+                state.traders.forEach(t => {
+                    const tEntries = state.entries.filter(e => e.trader === t.id);
+                    const totalIn = tEntries.filter(e => e.type === 'in').reduce((sum, e) => sum + e.amount, 0);
+                    const totalOut = tEntries.filter(e => e.type === 'out').reduce((sum, e) => sum + e.amount, 0);
+                    const netBal = totalIn - totalOut;
+                    let balColor = netBal > 0 ? '#2e7d32' : (netBal < 0 ? '#c62828' : '#2B2419');
 
-                const tr = document.createElement('tr');
-                tr.innerHTML = `
+                    const tr = document.createElement('tr');
+                    tr.innerHTML = `
                         <td>${escapeHtml(t.name)}</td>
                         <td>${escapeHtml(t.phone || '')}</td>
                         <td class="num" style="font-weight:700; color:${balColor}; text-align:right;">${fmt(netBal)}</td>
                         <td class="row-actions">
-                            <button class="edit-trader icon-btn" data-id="${t.id}" title="Edit">✏️</button>
-                            <button class="del-trader icon-btn" data-id="${t.id}" title="Delete">🗑️</button>
+                            <button class="edit-entity icon-btn" data-id="${t.id}" title="Edit">✏️</button>
+                            <button class="del-entity icon-btn" data-id="${t.id}" title="Delete">🗑️</button>
                         </td>`;
-                body.appendChild(tr);
-            });
-            body.querySelectorAll('.edit-trader').forEach(b => b.addEventListener('click', () => startEditTrader(b.dataset.id)));
-            body.querySelectorAll('.del-trader').forEach(b => b.addEventListener('click', () => deleteTraderWithConfirm(b.dataset.id)));
-        }
-
-        function startEditTrader(id) {
-            const t = state.traders.find(x => x.id === id);
-            if (!t) return;
-            traderEditingId = id;
-            document.getElementById('trader-name').value = t.name;
-            document.getElementById('trader-phone').value = t.phone || '';
-            document.getElementById('trader-save').textContent = 'Save changes';
-            document.getElementById('trader-cancel').style.display = 'inline-block';
-        }
-
-        function cancelEditTrader() {
-            traderEditingId = null;
-            document.getElementById('trader-save').textContent = 'Add trader';
-            document.getElementById('trader-cancel').style.display = 'none';
-            document.getElementById('trader-name').value = '';
-            document.getElementById('trader-phone').value = '';
-        }
-
-        async function deleteTraderWithConfirm(id) {
-            const t = state.traders.find(x => x.id === id);
-            if (!t) return;
-            if (state.entries.filter(e => e.trader === id).length > 0) {
-                await showModal(`Trader "${t.name}" is referenced and cannot be deleted.`, false, 'Cannot Delete');
-                return;
-            }
-            if (!await showModal(`Delete trader "${t.name}"?`, true, 'Confirm Deletion')) return;
-            state.traders = state.traders.filter(x => x.id !== id);
-            await window.storage.set(STORAGE_KEY, JSON.stringify(state));
-            renderTraders();
-            populateTraderSelect();
-            render();
-        }
-
-        // --- Labor Management ---
-        async function addLabor() {
-            const nameEl = document.getElementById('labor-name');
-            const phoneEl = document.getElementById('labor-phone');
-            if (!nameEl) return;
-            const name = (nameEl.value || '').trim();
-            const phone = phoneEl ? (phoneEl.value || '').trim() : '';
-            if (!name) {
-                await showModal('Enter a worker name.', false, 'Missing Name');
-                nameEl.focus();
-                return;
-            }
-            if (laborEditingId) {
-                const l = state.labor.find(x => x.id === laborEditingId);
-                if (l) Object.assign(l, { name, phone });
-                laborEditingId = null;
-                document.getElementById('labor-save').textContent = 'Add worker';
-                document.getElementById('labor-cancel').style.display = 'none';
+                    body.appendChild(tr);
+                });
             } else {
-                state.labor.push({ id: uid(), name, phone });
-            }
-            await window.storage.set(STORAGE_KEY, JSON.stringify(state));
-            nameEl.value = '';
-            if (phoneEl) phoneEl.value = '';
-            renderLabor();
-            populateTraderSelect();
-            render();
-        }
+                if (!state.labor || state.labor.length === 0) {
+                    body.innerHTML = '<tr><td colspan="4" class="empty-note" style="padding:18px;">No labor records yet.</td></tr>';
+                    return;
+                }
+                state.labor.forEach(l => {
+                    const lEntries = state.entries.filter(e => e.trader === l.id);
+                    const totalIn = lEntries.filter(e => e.type === 'in').reduce((sum, e) => sum + e.amount, 0);
+                    const totalOut = lEntries.filter(e => e.type === 'out').reduce((sum, e) => sum + e.amount, 0);
+                    const netBal = totalOut - totalIn;
+                    let balColor = netBal > 0 ? '#c62828' : (netBal < 0 ? '#2e7d32' : '#2B2419');
 
-        function renderLabor() {
-            const body = document.getElementById('labor-body');
-            if (!body) return;
-            body.innerHTML = '';
-            if (!state.labor || state.labor.length === 0) {
-                body.innerHTML = '<tr><td colspan="4" class="empty-note" style="padding:18px;">No labor records yet.</td></tr>';
-                return;
-            }
-
-            state.labor.forEach(l => {
-                const lEntries = state.entries.filter(e => e.trader === l.id);
-                const totalIn = lEntries.filter(e => e.type === 'in').reduce((sum, e) => sum + e.amount, 0);
-                const totalOut = lEntries.filter(e => e.type === 'out').reduce((sum, e) => sum + e.amount, 0);
-                const netBal = totalOut - totalIn; // Amount owed to labor
-                let balColor = netBal > 0 ? '#c62828' : (netBal < 0 ? '#2e7d32' : '#2B2419');
-
-                const tr = document.createElement('tr');
-                tr.innerHTML = `
+                    const tr = document.createElement('tr');
+                    tr.innerHTML = `
                         <td>${escapeHtml(l.name)}</td>
                         <td>${escapeHtml(l.phone || '')}</td>
                         <td class="num" style="font-weight:700; color:${balColor}; text-align:right;">${fmt(netBal)}</td>
                         <td class="row-actions">
-                            <button class="edit-labor icon-btn" data-id="${l.id}" title="Edit">✏️</button>
-                            <button class="del-labor icon-btn" data-id="${l.id}" title="Delete">🗑️</button>
+                            <button class="edit-entity icon-btn" data-id="${l.id}" title="Edit">✏️</button>
+                            <button class="del-entity icon-btn" data-id="${l.id}" title="Delete">🗑️</button>
                         </td>`;
-                body.appendChild(tr);
-            });
-            body.querySelectorAll('.edit-labor').forEach(b => b.addEventListener('click', () => startEditLabor(b.dataset.id)));
-            body.querySelectorAll('.del-labor').forEach(b => b.addEventListener('click', () => deleteLaborWithConfirm(b.dataset.id)));
+                    body.appendChild(tr);
+                });
+            }
+
+            body.querySelectorAll('.edit-entity').forEach(b => b.addEventListener('click', () => startCombinedEdit(b.dataset.id)));
+            body.querySelectorAll('.del-entity').forEach(b => b.addEventListener('click', () => deleteCombinedEntityWithConfirm(b.dataset.id)));
         }
 
-        function startEditLabor(id) {
-            const l = state.labor.find(x => x.id === id);
-            if (!l) return;
-            laborEditingId = id;
-            document.getElementById('labor-name').value = l.name;
-            document.getElementById('labor-phone').value = l.phone || '';
-            document.getElementById('labor-save').textContent = 'Save changes';
-            document.getElementById('labor-cancel').style.display = 'inline-block';
+        function startCombinedEdit(id) {
+            const entity = currentViewType === 'trader' 
+                ? state.traders.find(x => x.id === id)
+                : state.labor.find(x => x.id === id);
+            if (!entity) return;
+            
+            combinedEditingId = id;
+            document.getElementById('entity-name').value = entity.name;
+            document.getElementById('entity-phone').value = entity.phone || '';
+            document.getElementById('entity-save').textContent = 'Save changes';
+            document.getElementById('entity-cancel').style.display = 'inline-block';
         }
 
-        function cancelEditLabor() {
-            laborEditingId = null;
-            document.getElementById('labor-save').textContent = 'Add worker';
-            document.getElementById('labor-cancel').style.display = 'none';
-            document.getElementById('labor-name').value = '';
-            document.getElementById('labor-phone').value = '';
+        function cancelCombinedEdit() {
+            combinedEditingId = null;
+            document.getElementById('entity-save').textContent = currentViewType === 'trader' ? 'Add Trader' : 'Add Worker';
+            document.getElementById('entity-cancel').style.display = 'none';
+            document.getElementById('entity-name').value = '';
+            document.getElementById('entity-phone').value = '';
         }
 
-        async function deleteLaborWithConfirm(id) {
-            const l = state.labor.find(x => x.id === id);
-            if (!l) return;
+        async function deleteCombinedEntityWithConfirm(id) {
+            const entityName = currentViewType === 'trader' ? 'Trader' : 'Labor worker';
+            const collection = currentViewType === 'trader' ? state.traders : state.labor;
+            const item = collection.find(x => x.id === id);
+            if (!item) return;
+
             if (state.entries.filter(e => e.trader === id).length > 0) {
-                await showModal(`Labor worker "${l.name}" is referenced and cannot be deleted.`, false, 'Cannot Delete');
+                await showModal(`${entityName} "${item.name}" is referenced in cash transactions and cannot be deleted.`, false, 'Cannot Delete');
                 return;
             }
-            if (!await showModal(`Delete worker "${l.name}"?`, true, 'Confirm Deletion')) return;
-            state.labor = state.labor.filter(x => x.id !== id);
+            if (!await showModal(`Delete ${entityName.toLowerCase()} "${item.name}"?`, true, 'Confirm Deletion')) return;
+
+            if (currentViewType === 'trader') {
+                state.traders = state.traders.filter(x => x.id !== id);
+            } else {
+                state.labor = state.labor.filter(x => x.id !== id);
+            }
+
             await window.storage.set(STORAGE_KEY, JSON.stringify(state));
-            renderLabor();
+            renderCombinedEntities();
             populateTraderSelect();
             render();
         }
@@ -1107,18 +1114,43 @@
                 render();
             }
 
-            if (event.target && event.target.id === 'opening-save') {
-                const btn = document.getElementById('opening-save');
+            // --- OPENING CASH BALANCE TOGGLE ---
+            if (event.target && event.target.closest('#edit-opening-balance-btn')) {
+                const btn = event.target.closest('#edit-opening-balance-btn');
                 const input = document.getElementById('opening-input');
+
                 if (input.disabled) {
+                    // EDIT MODE
                     input.disabled = false;
                     input.focus();
-                    btn.textContent = 'Save';
+
+                    btn.style.background = '#e8f5e9';
+                    btn.style.borderColor = '#2e7d32';
+                    btn.style.color = '#2e7d32';
+                    btn.title = "Save Balance";
+                    btn.innerHTML = `
+                        <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+                            <polyline points="20 6 9 17 4 12"></polyline>
+                        </svg>
+                    `;
                 } else {
+                    // SAVE MODE
                     const v = parseFloat(input.value);
                     state.openingBalance = isNaN(v) ? 0 : v;
                     input.disabled = true;
-                    btn.textContent = 'Edit';
+
+                    // Restore original vector edit icon styling
+                    btn.style.background = '#d1dfd8';
+                    btn.style.borderColor = '#2e4d3e';
+                    btn.style.color = '#2e4d3e';
+                    btn.title = "Edit Balance";
+                    btn.innerHTML = `
+                        <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                            <path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"></path>
+                            <path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"></path>
+                        </svg>
+                    `;
+
                     await window.storage.set(STORAGE_KEY, JSON.stringify(state));
                     render();
                 }
@@ -1177,9 +1209,23 @@
                         targetView.classList.add('active');
                     }
 
+                    // ✨ THE FIX: Snap the window back to the top cleanly on tab switch
+                    window.scrollTo({
+                        top: 0,
+                        behavior: 'instant' // Use 'instant' so it doesn't jarringly animate while DOM updates
+                    });
+
                     // 4. Trigger lifecycle renders for targeted views
-                    if (viewName === 'traders') renderTraders();
-                    if (viewName === 'labor') renderLabor();
+                    if (viewName === 'traders' || viewName === 'labor') {
+                        // Ensure the view defaults nicely back to trader on tab transition
+                        const traderRadio = document.querySelector('input[name="entity-type-toggle"][value="trader"]');
+                        if (traderRadio) {
+                            traderRadio.checked = true;
+                            switchCombinedView('trader');
+                        } else {
+                            renderCombinedEntities();
+                        }
+                    }
                     if (viewName === 'inventory') renderInventoryLedger();
                     if (viewName === 'cashbook') populateTraderSelect();
 
@@ -1334,16 +1380,14 @@
             initMenuDrawer();
         }
 
-        // document.getElementById('f-category').addEventListener('change', () => {
-        //     if (document.getElementById('calc-toggle').checked) {
-        //         suggestLastRate();
-        //         const qty = parseFloat(document.getElementById('f-qty').value) || 0;
-        //         const rate = parseFloat(document.getElementById('f-rate').value) || 0;
-        //         document.getElementById('f-amount').value = (qty * rate) > 0 ? (qty * rate).toFixed(2) : '';
-        //     }
-        // });
-
         async function init() {
+            // Bind the segmented control radio switch triggers cleanly at start
+            document.querySelectorAll('input[name="entity-type-toggle"]').forEach(radio => {
+                radio.addEventListener('change', (e) => {
+                    switchCombinedView(e.target.value);
+                });
+            });
+
             document.getElementById('f-date').value = todayStr();
             populateCategorySelect();
             populateTraderSelect();
@@ -1359,8 +1403,7 @@
                     state.labor = Array.isArray(parsed.labor) ? parsed.labor : [];
                     state.stockAdjustments = Array.isArray(parsed.stockAdjustments) ? parsed.stockAdjustments : [];
                     document.getElementById('opening-input').value = state.openingBalance;
-                    renderTraders();
-                    renderLabor();
+                    renderCombinedEntities();
                     render();
                 }
             } catch (e) { }
@@ -1375,8 +1418,7 @@
                     state.labor = Array.isArray(parsed.labor) ? parsed.labor : [];
                     state.stockAdjustments = Array.isArray(parsed.stockAdjustments) ? parsed.stockAdjustments : [];
                     document.getElementById('opening-input').value = state.openingBalance;
-                    renderTraders();
-                    renderLabor();
+                    renderCombinedEntities();
                     render();
                 }
             } catch (e) { }
