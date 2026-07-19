@@ -722,3 +722,44 @@ tbody tr.pending-row {
         text-align: right;
         font-weight: 600;
     }
+
+/* --- ICON ACTION BUTTONS UTILITIES --- */
+.row-actions {
+    display: flex;
+    gap: 8px;
+    justify-content: flex-end;
+    align-items: center;
+    white-space: nowrap;
+}
+
+.icon-btn {
+    background: none !important;
+    border: none !important;
+    font-size: 16px !important;
+    cursor: pointer;
+    padding: 6px;
+    border-radius: 4px;
+    transition: background 0.2s ease, transform 0.1s ease;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    line-height: 1;
+}
+
+    .icon-btn:hover {
+        background: #f1f5f9 !important; /* Soft highlight background on hover */
+        transform: scale(1.1);
+    }
+
+    .icon-btn:active {
+        transform: scale(0.95);
+    }
+
+/* Specific styling for the delete element */
+button[data-del], button.del-trader, button.del-labor {
+    filter: drop-shadow(0 0 0 transparent);
+}
+
+    button[data-del]:hover, button.del-trader:hover, button.del-labor:hover {
+        background: #fee2e2 !important; /* Soft light red overlay window for deletion */
+    }

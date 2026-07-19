@@ -294,8 +294,8 @@
                         <td>${escapeHtml(t.phone || '')}</td>
                         <td class="num" style="font-weight:700; color:${balColor}; text-align:right;">${fmt(netBal)}</td>
                         <td class="row-actions">
-                            <button class="edit-trader" data-id="${t.id}">Edit</button>
-                            <button class="del-trader" data-id="${t.id}">Delete</button>
+                            <button class="edit-trader icon-btn" data-id="${t.id}" title="Edit">✏️</button>
+                            <button class="del-trader icon-btn" data-id="${t.id}" title="Delete">🗑️</button>
                         </td>`;
                 body.appendChild(tr);
             });
@@ -387,8 +387,8 @@
                         <td>${escapeHtml(l.phone || '')}</td>
                         <td class="num" style="font-weight:700; color:${balColor}; text-align:right;">${fmt(netBal)}</td>
                         <td class="row-actions">
-                            <button class="edit-labor" data-id="${l.id}">Edit</button>
-                            <button class="del-labor" data-id="${l.id}">Delete</button>
+                            <button class="edit-labor icon-btn" data-id="${l.id}" title="Edit">✏️</button>
+                            <button class="del-labor icon-btn" data-id="${l.id}" title="Delete">🗑️</button>
                         </td>`;
                 body.appendChild(tr);
             });
@@ -764,9 +764,9 @@
                         <td class="num out">${e.type === 'out' ? fmt(e.amount) : ''}</td>
                         <td class="num bal ${e.balance < 0 ? 'negative' : ''}">${fmt(e.balance)}</td>
                         <td class="row-actions">
-                          <button data-copy="${e.id}">Copy</button>
-                          <button data-edit="${e.id}">Edit</button>
-                          <button data-del="${e.id}">Delete</button>
+                          <button class="icon-btn" data-copy="${e.id}" title="Copy">📋</button>
+                          <button class="icon-btn" data-edit="${e.id}" title="Edit">✏️</button>
+                          <button class="icon-btn" data-del="${e.id}" title="Delete">🗑️</button>
                         </td>`;
                 body.appendChild(tr);
             });

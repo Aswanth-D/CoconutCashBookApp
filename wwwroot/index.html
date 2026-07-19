@@ -7,6 +7,8 @@
     <!-- Include the Supabase JS library from CDN -->
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
     <link rel="stylesheet" href="css/styles.css">
+    <!-- Native Inline Vector Favicon (Kept for the web page alone) -->
+    <link rel="icon" type="image/svg+xml" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 512 512'%3E%3Cpath fill='%235B3A20' d='M256 32C132.3 32 32 132.3 32 256s100.3 224 224 224 224-100.3 224-224S379.7 32 256 32zm0 400c-97.2 0-176-78.8-176-176S158.8 80 256 80s176 78.8 176 176-78.8 176-176 176z'/%3E%3Cpath fill='%23f4f1ea' d='M256 80c-97.2 0-176 78.8-176 176s78.8 176 176 176 176-78.8 176-176S353.2 80 256 80zm20 110c0 11-9 20-20 20s-20-9-20-20 9-20 20-20 20 9 20 20zm-60 80c0 11-9 20-20 20s-20-9-20-20 9-20 20-20 20 9 20 20zm80 40c0 11-9 20-20 20s-20-9-20-20 9-20 20-20 20 9 20 20z'/%3E%3Ccircle cx='216' cy='190' r='14' fill='%235B3A20'/%3E%3Ccircle cx='176' cy='270' r='14' fill='%235B3A20'/%3E%3Ccircle cx='256' cy='310' r='14' fill='%235B3A20'/%3E%3C/svg%3E">
 </head>
 <body>
     <!-- Modern Mobile Sticky Bottom Navigation Menu (Kite Style with Icons) -->
@@ -70,9 +72,13 @@
     </div>
 
     <!-- Main Navigation Sidebar Drawer Container -->
-    <header>
-        <h1>Coconut Cash Book</h1>
-        <p></p>
+    <header style="padding: 20px 16px;">
+        <div class="brand-container" style="display: flex; align-items: center; gap: 12px; margin-bottom: 20px;">
+            <h1 style="margin: 0; font-size: 20px; font-weight: 700; color: #ffffff; line-height: 1.2; letter-spacing: 0.5px;">
+                Coconut <br>Cash Book
+            </h1>
+        </div>
+
         <nav>
             <!-- Desktop Layout keeps all tabs visible; Mobile CSS handles hiding/showing -->
             <button class="tab-btn active desk-only" data-view="dashboard">Dashboard</button>
