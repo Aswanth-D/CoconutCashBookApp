@@ -46,6 +46,13 @@
         <SupportedOSPlatformVersion Condition="$([MSBuild]::GetTargetPlatformIdentifier('$(TargetFramework)')) == 'android'">24.0</SupportedOSPlatformVersion>
         <SupportedOSPlatformVersion Condition="$([MSBuild]::GetTargetPlatformIdentifier('$(TargetFramework)')) == 'windows'">10.0.17763.0</SupportedOSPlatformVersion>
         <TargetPlatformMinVersion Condition="$([MSBuild]::GetTargetPlatformIdentifier('$(TargetFramework)')) == 'windows'">10.0.17763.0</TargetPlatformMinVersion>
+		<!-- Forces the Android tasks to run sequentially to prevent memory deadlock -->
+		<AndroidCreateSharedRuntime>false</AndroidCreateSharedRuntime>
+		<CommandLineArgs></CommandLineArgs>
+		<DisableConcurrentAndroidBuilds>true</DisableConcurrentAndroidBuilds>
+		<!-- Allocates 4GB of heap memory to the Java build processes -->
+		<AndroidDxExtraArguments>-JXmx4g</AndroidDxExtraArguments>
+		<JavaMaximumHeapSize>4G</JavaMaximumHeapSize>
     </PropertyGroup>
 
     <ItemGroup>

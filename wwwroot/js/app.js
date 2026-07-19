@@ -1132,19 +1132,6 @@
                 populateTraderSelect();
             }
 
-            if (event.target.classList.contains('tab-btn')) {
-                const btn = event.target;
-                document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
-                document.querySelectorAll('.view').forEach(v => v.classList.remove('active'));
-                btn.classList.add('active');
-                document.getElementById('view-' + btn.dataset.view).classList.add('active');
-
-                if (btn.dataset.view === 'traders') renderTraders();
-                if (btn.dataset.view === 'labor') renderLabor();
-                if (btn.dataset.view === 'inventory') renderInventoryLedger();
-                if (btn.dataset.view === 'cashbook') populateTraderSelect();
-            }
-
             if (event.target.classList.contains('filter-btn')) {
                 const btn = event.target;
                 event.stopPropagation();
@@ -1168,6 +1155,52 @@
                     customContainer.style.display = 'none';
                 }
                 renderCashBook();
+            }
+
+            // --- UNIFIED TABS & MOBILE NAVIGATION FIX ---
+            const targetButton = event.target.closest('.tab-btn');
+            if (targetButton) {
+                const viewName = targetButton.getAttribute('data-view');
+
+                // If it's a structural view tab change
+                if (viewName) {
+                    // 1. Remove active states across ALL navigation platforms (Sidebar + Mobile Bar)
+                    document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
+                    document.querySelectorAll('.view').forEach(v => v.classList.remove('active'));
+
+                    // 2. Synchronize active state to both desktop and mobile buttons matching this view
+                    document.querySelectorAll(`[data-view="${viewName}"]`).forEach(b => b.classList.add('active'));
+
+                    // 3. Activate the matching target view container
+                    const targetView = document.getElementById('view-' + viewName);
+                    if (targetView) {
+                        targetView.classList.add('active');
+                    }
+
+                    // 4. Trigger lifecycle renders for targeted views
+                    if (viewName === 'traders') renderTraders();
+                    if (viewName === 'labor') renderLabor();
+                    if (viewName === 'inventory') renderInventoryLedger();
+                    if (viewName === 'cashbook') populateTraderSelect();
+
+                    // Automatically close the sidebar drawer on mobile/tablet after picking a view
+                    const sidebar = document.querySelector("header");
+                    if (sidebar && window.innerWidth <= 1024) {
+                        sidebar.classList.remove("drawer-open");
+                    }
+
+                    return; // Stop execution since navigation was handled
+                }
+
+                // If it's the "More" button (has class .tab-btn but NO data-view)
+                else {
+                    const sidebar = document.querySelector("header");
+                    if (sidebar) {
+                        event.stopPropagation(); // Keep global handlers from closing it instantly
+                        sidebar.classList.toggle("drawer-open");
+                    }
+                    return;
+                }
             }
         });
 
@@ -1267,6 +1300,38 @@
             if (lastMatchingEntry) {
                 document.getElementById('f-rate').value = lastMatchingEntry.rate;
             }
+        }
+
+        function initMenuDrawer() {
+            const menuToggle = document.getElementById("menuToggleBtn");
+            const sidebar = document.querySelector("header");
+        
+            if (!menuToggle || !sidebar) return;
+        
+            // Open/Close toggle assignment for hamburger icon click
+            menuToggle.onclick = (e) => {
+                e.stopPropagation();
+                sidebar.classList.toggle("drawer-open");
+            };
+        
+            // Close drawer panel if user taps empty space outside the menu
+            document.addEventListener('click', (e) => {
+                if (window.innerWidth <= 1024) {
+                    const clickedMenu = menuToggle.contains(e.target);
+                    const clickedSidebar = sidebar.contains(e.target);
+        
+                    if (!clickedSidebar && !clickedMenu) {
+                        sidebar.classList.remove("drawer-open");
+                    }
+                }
+            });
+        }
+        
+        // Fallback cascade initialization to ensure it catches the engine lifecycle
+        if (document.readyState === "loading") {
+            document.addEventListener("DOMContentLoaded", initMenuDrawer);
+        } else {
+            initMenuDrawer();
         }
 
         // document.getElementById('f-category').addEventListener('change', () => {

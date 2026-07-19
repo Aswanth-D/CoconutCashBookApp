@@ -8,16 +8,35 @@
 
 <h2 class="section-title">Category summary</h2>
 <div class="summary-grid">
+    <!-- Category Summary In Grid -->
     <div class="table-wrap">
         <table>
-            <thead><tr><th>Summary In</th><th style="text-align:right;">Total</th></tr></thead>
-            <tbody id="cat-in-body"></tbody>
+            <thead>
+                <tr>
+                    <th style="width: 60%;">Summary In</th>
+                    <th style="width: 40%; text-align: right;">Amount</th>
+                </tr>
+            </thead>
+            <!-- The JavaScript targets this ID to inject dynamic values dynamically -->
+            <tbody id="cat-in-body">
+                <!-- JavaScript will insert rows here automatically -->
+            </tbody>
         </table>
     </div>
+
+    <!-- Category Summary Out Grid -->
     <div class="table-wrap">
         <table>
-            <thead><tr><th>Summary Out</th><th style="text-align:right;">Total</th></tr></thead>
-            <tbody id="cat-out-body"></tbody>
+            <thead>
+                <tr>
+                    <th style="width: 60%;">Summary Out</th>
+                    <th style="width: 40%; text-align: right;">Amount</th>
+                </tr>
+            </thead>
+            <!-- The JavaScript targets this ID to inject dynamic values dynamically -->
+            <tbody id="cat-out-body">
+                <!-- JavaScript will insert rows here automatically -->
+            </tbody>
         </table>
     </div>
 </div>
