@@ -1,53 +1,221 @@
 
-        // ==========================================
-        // --- SUPABASE CONFIGURATION ---
-        // ==========================================
-        const SUPABASE_URL = 'https://ocnfbgubhqvyxidlsdir.supabase.co';
-        const SUPABASE_ANON_KEY = 'sb_publishable_JmfXhemd49Ej1J_bST4dWg_r_BnOzX0';
-        const STORAGE_KEY = 'coconut-cashbook-data';
+// ==========================================
+// --- UPDATED SUPABASE CONFIGURATION ---
+// ==========================================
+const SUPABASE_URL = 'https://ocnfbgubhqvyxidlsdir.supabase.co';
+const SUPABASE_ANON_KEY = 'sb_publishable_JmfXhemd49Ej1J_bST4dWg_r_BnOzX0';
+const STORAGE_KEY = 'coconut-cashbook-data';
 
-        const supabaseClient = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+const supabaseClient = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
 
-        window.storage = {
-            async get(key) {
-                const note = document.getElementById('save-note');
-                try {
-                    const { data, error } = await supabaseClient
-                        .from('app_state')
-                        .select('state')
-                        .eq('id', 'main')
-                        .single();
-                    if (error && error.code !== 'PGRST116') throw error;
-                    if (data && data.state) {
-                        if (note) note.textContent = 'Data synced from Cloud Database.';
-                        return { value: JSON.stringify(data.state) };
-                    }
-                    return { value: localStorage.getItem(key) };
-                } catch (e) {
-                    console.error("Database read error:", e);
-                    if (note) note.textContent = 'Offline. Showing cached local data.';
-                    return { value: localStorage.getItem(key) };
+window.storage = {
+    async get(key) {
+        const note = document.getElementById('save-note');
+        try {
+            // 1. Fetch live transactions, stakeholders, AND stock adjustments in parallel
+            const [txRes, traderRes, laborRes, stockRes] = await Promise.all([
+                supabaseClient.from('transactions').select('*'),
+                (async () => {
+                    try { return await supabaseClient.from('traders').select('*'); }
+                    catch (e) { return { data: [] }; }
+                })(),
+                (async () => {
+                    try { return await supabaseClient.from('labor').select('*'); }
+                    catch (e) { return { data: [] }; }
+                })(),
+                (async () => {
+                    try { return await supabaseClient.from('stock_adjustments').select('*'); }
+                    catch (e) { return { data: [] }; }
+                })()
+            ]);
+
+            if (txRes.error) throw txRes.error;
+
+            const dbEntries = txRes.data;
+            const dbTraders = traderRes.data || [];
+            const dbLabor = laborRes.data || [];
+            const dbStock = stockRes.data || [];
+
+            if (dbEntries && dbEntries.length > 0) {
+                if (note) note.textContent = 'Data synced from Cloud Database.';
+
+                // Map database fields back to application state format
+                const mappedEntries = dbEntries.map(tx => ({
+                    id: tx.id,
+                    date: tx.date,
+                    description: tx.description,
+                    category: tx.category,
+                    type: tx.type,
+                    amount: parseFloat(tx.amount),
+                    status: tx.status,
+                    notes: tx.notes,
+                    trader: tx.category === 'Labor Wages' ? tx.labor_id : tx.trader_id,
+                    qty: tx.qty !== undefined ? tx.qty : null,
+                    rate: tx.rate !== undefined ? tx.rate : null,
+                    unit: tx.unit || 'Units',
+                    convFactor: tx.conv_factor || 0,
+                    stockQty: tx.stock_qty || 0
+                }));
+
+                // Standardize and deduplicate by ID to prevent grid duplication
+                const uniqueEntriesMap = new Map();
+                mappedEntries.forEach(item => {
+                    if (item.id) uniqueEntriesMap.set(item.id, item);
+                });
+                const cleanEntries = Array.from(uniqueEntriesMap.values());
+
+                // Map stock adjustments accurately from database structure
+                const mappedStock = dbStock.map(s => ({
+                    id: s.id,
+                    batchId: s.batch_id,
+                    date: s.date,
+                    commodity: s.commodity,
+                    direction: s.direction,
+                    qty: parseFloat(s.qty) || 0,
+                    description: s.description
+                }));
+
+                const currentLocalState = JSON.parse(localStorage.getItem(key)) || {};
+
+                state = {
+                    openingBalance: currentLocalState.openingBalance || 0,
+                    entries: cleanEntries,
+                    traders: dbTraders.length > 0 ? dbTraders : (currentLocalState.traders || []),
+                    labor: dbLabor.length > 0 ? dbLabor : (currentLocalState.labor || []),
+                    stockAdjustments: mappedStock.length > 0 ? mappedStock : (currentLocalState.stockAdjustments || [])
+                };
+                return { value: JSON.stringify(state) };
+            }
+            return { value: localStorage.getItem(key) };
+        } catch (e) {
+            console.error("Database read error:", e);
+            if (note) note.textContent = 'Offline. Showing cached local data.';
+            return { value: localStorage.getItem(key) };
+        }
+    },
+
+    async set(key, value) {
+        const note = document.getElementById('save-note');
+        try {
+            localStorage.setItem(key, value);
+            if (note) note.textContent = 'Syncing updates...';
+
+            const parsedState = JSON.parse(value);
+            const isValidUUID = (id) => {
+                const uuidRegex = /^[0-9a-f]{8}-[0-9a-f]{4}-[4][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
+                return uuidRegex.test(id);
+            };
+
+            // --- 1. HANDLE TRANSACTIONS SYNC & DELETIONS ---
+            const dbTransactions = parsedState.entries.map(e => {
+                const isLabor = e.category === 'Labor Wages';
+                let rawStakeholderId = e.trader || null;
+
+                let cleanTraderId = !isLabor && isValidUUID(rawStakeholderId) ? rawStakeholderId : null;
+                let cleanLaborId = isLabor && isValidUUID(rawStakeholderId) ? rawStakeholderId : null;
+
+                if (!isValidUUID(e.id)) {
+                    e.id = uid();
                 }
-            },
-            async set(key, value) {
-                const note = document.getElementById('save-note');
-                try {
-                    localStorage.setItem(key, value);
-                    if (note) note.textContent = 'Syncing updates...';
-                    const parsedState = JSON.parse(value);
-                    const { error } = await supabaseClient
-                        .from('app_state')
-                        .upsert({ id: 'main', state: parsedState }, { onConflict: 'id' });
-                    if (error) throw error;
-                    if (note) note.textContent = 'All data is saved automatically to the cloud.';
-                    return true;
-                } catch (e) {
-                    console.error("Database write error:", e);
-                    if (note) note.textContent = 'Pending sync. Saved locally.';
-                    throw e;
+
+                return {
+                    id: e.id,
+                    date: e.date,
+                    description: e.description || '',
+                    category: e.category,
+                    type: e.type,
+                    amount: parseFloat(e.amount) || 0,
+                    trader_id: cleanTraderId,
+                    labor_id: cleanLaborId,
+                    status: e.status || 'Paid',
+                    notes: e.notes || '',
+                    qty: e.qty,
+                    rate: e.rate,
+                    unit: e.unit || 'Units',
+                    conv_factor: e.convFactor || 0,
+                    stock_qty: e.stockQty || 0
+                };
+            });
+
+            // Fetch current transaction IDs in DB to handle missing/deleted items
+            const { data: currentTxData } = await supabaseClient.from('transactions').select('id');
+            if (currentTxData) {
+                const localTxIds = new Set(dbTransactions.map(tx => tx.id));
+                const missingTxIds = currentTxData.map(tx => tx.id).filter(id => !localTxIds.has(id));
+
+                // If rows were deleted locally, scrub them from the database
+                if (missingTxIds.length > 0) {
+                    await supabaseClient.from('transactions').delete().in('id', missingTxIds);
                 }
             }
-        };
+
+            if (dbTransactions.length > 0) {
+                const { error } = await supabaseClient
+                    .from('transactions')
+                    .upsert(dbTransactions, { onConflict: 'id' });
+                if (error) throw error;
+            }
+
+
+            // --- 2. HANDLE STOCK ADJUSTMENTS SYNC & DELETIONS ---
+            if (parsedState.stockAdjustments) {
+                try {
+                    const dbStockMapped = parsedState.stockAdjustments.map(adj => ({
+                        id: adj.id || uid(),
+                        batch_id: adj.batchId,
+                        date: adj.date,
+                        commodity: adj.commodity,
+                        direction: adj.direction,
+                        qty: adj.qty,
+                        description: adj.description || ''
+                    }));
+
+                    // Fetch current stock adjustment IDs in DB to discover hard deletions
+                    const { data: currentStockData } = await supabaseClient.from('stock_adjustments').select('id');
+                    if (currentStockData) {
+                        const localStockIds = new Set(dbStockMapped.map(s => s.id));
+                        const missingStockIds = currentStockData.map(s => s.id).filter(id => !localStockIds.has(id));
+
+                        if (missingStockIds.length > 0) {
+                            await supabaseClient.from('stock_adjustments').delete().in('id', missingStockIds);
+                        }
+                    }
+
+                    if (dbStockMapped.length > 0) {
+                        await supabaseClient.from('stock_adjustments').upsert(dbStockMapped, { onConflict: 'id' });
+                    }
+                } catch (stockError) {
+                    console.warn("Stock database logs sync failed:", stockError);
+                }
+            }
+
+
+            // --- 3. TRADERS & LABOR PROFILES (Standard Upsert Only) ---
+            if (parsedState.traders && parsedState.traders.length > 0) {
+                try {
+                    await supabaseClient.from('traders').upsert(parsedState.traders, { onConflict: 'id' });
+                } catch (traderError) {
+                    console.warn("Traders background sync failed:", traderError);
+                }
+            }
+
+            if (parsedState.labor && parsedState.labor.length > 0) {
+                try {
+                    await supabaseClient.from('labor').upsert(parsedState.labor, { onConflict: 'id' });
+                } catch (laborError) {
+                    console.warn("Labor background sync failed:", laborError);
+                }
+            }
+
+            if (note) note.textContent = 'All data is saved automatically to the cloud.';
+            return true;
+        } catch (e) {
+            console.error("Database write error:", e);
+            if (note) note.textContent = 'Pending sync. Saved locally.';
+            throw e;
+        }
+    }
+};
 
         const DRAFT_KEY = 'coconut-cashbook-draft';
         const CATEGORIES = {
@@ -91,19 +259,15 @@
 
             state = { openingBalance: 0, entries: [], traders: [], labor: [], stockAdjustments: [] };
 
-            try {
-                localStorage.removeItem(STORAGE_KEY);
-                localStorage.removeItem(DRAFT_KEY);
-            } catch (e) { console.error("Error clearing localStorage:", e); }
-
             const note = document.getElementById('save-note');
             if (note) note.textContent = 'Purging remote system...';
 
             try {
-                const { error } = await supabaseClient
-                    .from('app_state')
-                    .upsert({ id: 'main', state: state }, { onConflict: 'id' });
-                if (error) throw error;
+                // Wipe transactions and stock adjustments in tandem
+                await Promise.all([
+                    supabaseClient.from('transactions').delete().neq('id', '00000000-0000-0000-0000-000000000000'),
+                    supabaseClient.from('stock_adjustments').delete().neq('id', '00000000-0000-0000-0000-000000000000')
+                ]);
                 if (note) note.textContent = 'All records successfully wiped from cloud.';
             } catch (e) {
                 console.error("Database cloud purge failed:", e);
@@ -203,8 +367,12 @@
         function todayStr() {
             return new Date().toISOString().slice(0, 10);
         }
+
         function uid() {
-            return 'e' + Date.now().toString(36) + Math.random().toString(36).slice(2, 7);
+            // Generates a cryptographically secure, standard UUID v4 string
+            return ([1e7] + -1e3 + -4e3 + -8e3 + -1e11).replace(/[018]/g, c =>
+                (c ^ crypto.getRandomValues(new Uint8Array(1))[0] & 15 >> c / 4).toString(16)
+            );
         }
 
         function saveDraft() {
@@ -530,15 +698,20 @@
             document.getElementById('stk-out-husk').value = '';
             document.getElementById('stk-desc').value = '';
 
-            renderInventoryLedger();
+            render();
         }
 
         async function deleteProcessingBatch(batchId) {
             if (!await showModal("Permanently remove all stock changes linked to this processing batch?", true, "Confirm Deletion")) return;
             if (state.stockAdjustments) {
+                // Filter down array parameters locally
                 state.stockAdjustments = state.stockAdjustments.filter(adj => adj.batchId !== batchId);
+                
+                // Trigger the database validation pipeline instantly
                 await window.storage.set(STORAGE_KEY, JSON.stringify(state));
-                renderInventoryLedger();
+                
+                // Re-render dashboard balances alongside inventory ledger views
+                render(); 
             }
         }
 
@@ -557,12 +730,14 @@
             sortedEntries().forEach(e => {
                 const ledgerQty = e.stockQty !== undefined && e.stockQty !== null ? e.stockQty : (e.qty || 0);
                 if (ledgerQty <= 0) return;
-        
+
                 let commodity = "Coconuts";
-                if (e.category && e.category.includes("Copra")) commodity = "Copra";
-                else if (e.category && e.category.includes("Oil")) commodity = "Oil";
-                else if (e.category && e.category.includes("Water")) commodity = "Water";
-                else if (e.category && (e.category.includes("Husk") || e.category.includes("Shell"))) commodity = "Husk/Shell";
+                const cat = (e.category || '').toLowerCase();
+
+                if (cat.includes("copra")) commodity = "Copra";
+                else if (cat.includes("oil")) commodity = "Oil";
+                else if (cat.includes("water")) commodity = "Water";
+                else if (cat.includes("husk") || cat.includes("shell")) commodity = "Husk/Shell";
         
                 const isPurchase = (e.type === 'out');
         
@@ -593,24 +768,36 @@
                 });
             });
         
+            // Account for batch process updates cleanly with standardized commodity tags
             if (state.stockAdjustments && Array.isArray(state.stockAdjustments)) {
                 state.stockAdjustments.forEach(adj => {
-                    const isAddition = (adj.direction === 'addition');
-                    const directionText = isAddition ? "➕ Production Add" : "➖ Processing Drop";
-        
-                    if (isAddition) {
-                        inventoryTotals[adj.commodity] += adj.qty;
-                    } else {
-                        inventoryTotals[adj.commodity] -= adj.qty;
+                    let commodity = adj.commodity;
+
+                    // Normalize variants like "Husk/Shell", "Husk Yield", or "Husk"
+                    if (commodity && (commodity.includes("Husk") || commodity.includes("Shell"))) {
+                        commodity = "Husk/Shell";
+                    } else if (commodity && commodity.includes("Copra")) {
+                        commodity = "Copra";
+                    } else if (commodity && commodity.includes("Coconut")) {
+                        commodity = "Coconuts";
                     }
-        
+
+                    if (inventoryTotals[commodity] !== undefined) {
+                        if (adj.direction === 'addition') {
+                            inventoryTotals[commodity] += adj.qty;
+                        } else {
+                            inventoryTotals[commodity] -= adj.qty;
+                        }
+                    }
+
+                    // ✨ PUSH BATCHES INTO THE LAYOUT DISPLAY GRID ARRAY
                     stockMovements.push({
                         date: adj.date,
-                        commodity: adj.commodity,
-                        direction: directionText,
+                        commodity: commodity,
+                        direction: adj.direction === 'addition' ? "➕ Production Yield" : "➖ Processing Intake",
                         qty: adj.qty,
                         rate: 0,
-                        party: adj.description || 'Internal Processing Batch',
+                        party: adj.description || 'Internal Processing Run',
                         isAdjustment: true,
                         batchId: adj.batchId
                     });
@@ -619,13 +806,6 @@
         
             stockMovements.sort((a, b) => (a.date > b.date ? 1 : a.date < b.date ? -1 : 0));
         
-            // kpiContainer.innerHTML = Object.keys(inventoryTotals).map(item => `
-            //         <div class="kpi">
-            //             <div class="label">${item} Balance Stock</div>
-            //             <div class="value" style="color: var(--palm-dark); font-weight: bold;">${inventoryTotals[item].toLocaleString()} Units</div>
-            //         </div>
-            //     `).join('');
-            // --- 1. Calculate the Live Yield Metrics from Batch History ---
             let totalCoconutsProcessed = 0;
             let totalCopraProduced = 0;
 
@@ -1035,11 +1215,19 @@
         });
 
         document.addEventListener('input', async (event) => {
+            // Check if user is editing quantity or rate parameters
             if (event.target && (event.target.id === 'f-qty' || event.target.id === 'f-rate')) {
+                const categoryEl = document.getElementById('f-category');
+                const category = categoryEl ? categoryEl.value : '';
+                
                 const qty = parseFloat(document.getElementById('f-qty').value) || 0;
                 const rate = parseFloat(document.getElementById('f-rate').value) || 0;
                 const total = qty * rate;
-                document.getElementById('f-amount').value = total > 0 ? total.toFixed(2) : '';
+                
+                const amountInput = document.getElementById('f-amount');
+                if (amountInput) {
+                    amountInput.value = total > 0 ? total.toFixed(2) : '';
+                }
             }
         });
 
