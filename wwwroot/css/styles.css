@@ -639,6 +639,13 @@ tbody tr.pending-row {
         margin-left: var(--sidebar-width);
         padding: 48px 56px;
     }
+
+    /* ADDED: Hide the mobile navigation components completely on desktop viewports */
+    .mobile-bottom-nav,
+    .mobile-quick-tabs,
+    .mobile-top-bar {
+        display: none !important;
+    }
 }
 
 /* --- MODERN SEGMENTED FILTERS OVERHAUL --- */
