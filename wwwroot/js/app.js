@@ -1,34 +1,40 @@
-
 // ==========================================
-// --- UPDATED SUPABASE CONFIGURATION ---
+// --- UPDATED SUPABASE CONFIGURATION & MULTI-YARD SUPPORT ---
 // ==========================================
 const SUPABASE_URL = 'https://ocnfbgubhqvyxidlsdir.supabase.co';
 const SUPABASE_ANON_KEY = 'sb_publishable_JmfXhemd49Ej1J_bST4dWg_r_BnOzX0';
 const STORAGE_KEY = 'coconut-cashbook-data';
+
+// Helper to acquire active User/Yard Tenant ID dynamically
+function getActiveYardId() {
+    return localStorage.getItem('user_yard_id') || 'main';
+}
 
 const supabaseClient = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
 
 window.storage = {
     async get(key) {
         const note = document.getElementById('save-note');
+        const activeYardId = getActiveYardId();
+
         try {
-            // 1. Fetch live transactions, stakeholders, stock adjustments, and settings in parallel
+            // 1. Fetch live transactions, stakeholders, stock adjustments, and settings for the active yard ID in parallel
             const [txRes, traderRes, laborRes, stockRes, settingsRes] = await Promise.all([
-                supabaseClient.from('transactions').select('*'),
+                supabaseClient.from('transactions').select('*').eq('yard_id', activeYardId),
                 (async () => {
-                    try { return await supabaseClient.from('traders').select('*'); }
+                    try { return await supabaseClient.from('traders').select('*').eq('yard_id', activeYardId); }
                     catch (e) { return { data: [] }; }
                 })(),
                 (async () => {
-                    try { return await supabaseClient.from('labor').select('*'); }
+                    try { return await supabaseClient.from('labor').select('*').eq('yard_id', activeYardId); }
                     catch (e) { return { data: [] }; }
                 })(),
                 (async () => {
-                    try { return await supabaseClient.from('stock_adjustments').select('*'); }
+                    try { return await supabaseClient.from('stock_adjustments').select('*').eq('yard_id', activeYardId); }
                     catch (e) { return { data: [] }; }
                 })(),
                 (async () => {
-                    try { return await supabaseClient.from('app_settings').select('*').eq('key', 'openingBalance'); }
+                    try { return await supabaseClient.from('app_settings').select('*').eq('yard_id', activeYardId).eq('key', 'openingBalance'); }
                     catch (e) { return { data: [] }; }
                 })()
             ]);
@@ -41,7 +47,7 @@ window.storage = {
             const dbStock = stockRes.data || [];
 
             if (dbEntries && dbEntries.length > 0) {
-                if (note) note.textContent = 'Data synced from Cloud Database.';
+                if (note) note.textContent = `Data synced from Cloud Database (Yard: ${activeYardId}).`;
 
                 // Map database fields back to application state format
                 const mappedEntries = dbEntries.map(tx => ({
@@ -106,6 +112,8 @@ window.storage = {
 
     async set(key, value) {
         const note = document.getElementById('save-note');
+        const activeYardId = getActiveYardId();
+
         try {
             localStorage.setItem(key, value);
             if (note) note.textContent = 'Syncing updates...';
@@ -130,6 +138,7 @@ window.storage = {
 
                 return {
                     id: e.id,
+                    yard_id: activeYardId,
                     date: e.date,
                     description: e.description || '',
                     category: e.category,
@@ -147,15 +156,22 @@ window.storage = {
                 };
             });
 
-            // Fetch current transaction IDs in DB to handle missing/deleted items
-            const { data: currentTxData } = await supabaseClient.from('transactions').select('id');
+            // Fetch current transaction IDs in DB for this yard to handle missing/deleted items
+            const { data: currentTxData } = await supabaseClient
+                .from('transactions')
+                .select('id')
+                .eq('yard_id', activeYardId);
+
             if (currentTxData) {
                 const localTxIds = new Set(dbTransactions.map(tx => tx.id));
                 const missingTxIds = currentTxData.map(tx => tx.id).filter(id => !localTxIds.has(id));
 
-                // If rows were deleted locally, scrub them from the database
                 if (missingTxIds.length > 0) {
-                    await supabaseClient.from('transactions').delete().in('id', missingTxIds);
+                    await supabaseClient
+                        .from('transactions')
+                        .delete()
+                        .eq('yard_id', activeYardId)
+                        .in('id', missingTxIds);
                 }
             }
 
@@ -166,12 +182,12 @@ window.storage = {
                 if (error) throw error;
             }
 
-
             // --- 2. HANDLE STOCK ADJUSTMENTS SYNC & DELETIONS ---
             if (parsedState.stockAdjustments) {
                 try {
                     const dbStockMapped = parsedState.stockAdjustments.map(adj => ({
                         id: adj.id || uid(),
+                        yard_id: activeYardId,
                         batch_id: adj.batchId,
                         date: adj.date,
                         commodity: adj.commodity,
@@ -180,14 +196,21 @@ window.storage = {
                         description: adj.description || ''
                     }));
 
-                    // Fetch current stock adjustment IDs in DB to discover hard deletions
-                    const { data: currentStockData } = await supabaseClient.from('stock_adjustments').select('id');
+                    const { data: currentStockData } = await supabaseClient
+                        .from('stock_adjustments')
+                        .select('id')
+                        .eq('yard_id', activeYardId);
+
                     if (currentStockData) {
                         const localStockIds = new Set(dbStockMapped.map(s => s.id));
                         const missingStockIds = currentStockData.map(s => s.id).filter(id => !localStockIds.has(id));
 
                         if (missingStockIds.length > 0) {
-                            await supabaseClient.from('stock_adjustments').delete().in('id', missingStockIds);
+                            await supabaseClient
+                                .from('stock_adjustments')
+                                .delete()
+                                .eq('yard_id', activeYardId)
+                                .in('id', missingStockIds);
                         }
                     }
 
@@ -199,11 +222,11 @@ window.storage = {
                 }
             }
 
-
-            // --- 3. TRADERS & LABOR PROFILES (Standard Upsert Only) ---
+            // --- 3. TRADERS & LABOR PROFILES ---
             if (parsedState.traders && parsedState.traders.length > 0) {
                 try {
-                    await supabaseClient.from('traders').upsert(parsedState.traders, { onConflict: 'id' });
+                    const mappedTraders = parsedState.traders.map(t => ({ ...t, yard_id: activeYardId }));
+                    await supabaseClient.from('traders').upsert(mappedTraders, { onConflict: 'id' });
                 } catch (traderError) {
                     console.warn("Traders background sync failed:", traderError);
                 }
@@ -211,7 +234,8 @@ window.storage = {
 
             if (parsedState.labor && parsedState.labor.length > 0) {
                 try {
-                    await supabaseClient.from('labor').upsert(parsedState.labor, { onConflict: 'id' });
+                    const mappedLabor = parsedState.labor.map(l => ({ ...l, yard_id: activeYardId }));
+                    await supabaseClient.from('labor').upsert(mappedLabor, { onConflict: 'id' });
                 } catch (laborError) {
                     console.warn("Labor background sync failed:", laborError);
                 }
@@ -220,9 +244,10 @@ window.storage = {
             // --- 4. OPENING BALANCE SYNC ---
             try {
                 await supabaseClient.from('app_settings').upsert({
+                    yard_id: activeYardId,
                     key: 'openingBalance',
                     value: String(parsedState.openingBalance || 0)
-                }, { onConflict: 'key' });
+                }, { onConflict: 'yard_id,key' });
             } catch (settingsErr) {
                 console.warn("Opening balance sync failed:", settingsErr);
             }
@@ -237,80 +262,84 @@ window.storage = {
     }
 };
 
-        const DRAFT_KEY = 'coconut-cashbook-draft';
-        const CATEGORIES = {
-            in: ["Copra Sales", "Husk/Shell Sales", "Coconut Oil Sales", "Advance Received", "Other Income"],
-            out: ["Coconut Purchase", "Labor Wages", "Transport/Freight", "Loading/Unloading", "Electricity/Fuel", "Commission/Brokerage", "Other Expense"]
-        };
+const DRAFT_KEY = 'coconut-cashbook-draft';
+const CATEGORIES = {
+    in: ["Copra Sales", "Husk/Shell Sales", "Coconut Oil Sales", "Advance Received", "Other Income"],
+    out: ["Coconut Purchase", "Labor Wages", "Transport/Freight", "Loading/Unloading", "Electricity/Fuel", "Commission/Brokerage", "Other Expense"]
+};
 
-        let state = { openingBalance: 0, entries: [], traders: [], labor: [], stockAdjustments: [] };
-        let currentType = 'in';
-        let currentFilter = 'all';
-        let currentDateRange = 'all';
-        let editingId = null;
-        let currentViewType = 'trader';
-        let combinedEditingId = null;
+let state = { openingBalance: 0, entries: [], traders: [], labor: [], stockAdjustments: [] };
+let currentType = 'in';
+let currentFilter = 'all';
+let currentDateRange = 'all';
+let editingId = null;
+let currentViewType = 'trader';
+let combinedEditingId = null;
 
-        function checkPurgeLock() {
-            const inputVal = document.getElementById('purge-lock-input').value.trim();
-            const btn = document.getElementById('purge-data-btn');
+function checkPurgeLock() {
+    const inputVal = document.getElementById('purge-lock-input').value.trim();
+    const btn = document.getElementById('purge-data-btn');
 
-            if (inputVal === "RESET") {
-                btn.removeAttribute('disabled');
-                btn.style.background = 'var(--rust)';
-                btn.style.borderColor = 'var(--rust-dark)';
-                btn.style.color = '#ffffff';
-                btn.style.cursor = 'pointer';
-            } else {
-                btn.setAttribute('disabled', 'true');
-                btn.style.background = '#cbd5e1';
-                btn.style.borderColor = '#94a3b8';
-                btn.style.color = '#64748b';
-                btn.style.cursor = 'not-allowed';
-            }
-        }
+    if (inputVal === "RESET") {
+        btn.removeAttribute('disabled');
+        btn.style.background = 'var(--rust)';
+        btn.style.borderColor = 'var(--rust-dark)';
+        btn.style.color = '#ffffff';
+        btn.style.cursor = 'pointer';
+    } else {
+        btn.setAttribute('disabled', 'true');
+        btn.style.background = '#cbd5e1';
+        btn.style.borderColor = '#94a3b8';
+        btn.style.color = '#64748b';
+        btn.style.cursor = 'not-allowed';
+    }
+}
 
-        async function completelyResetAllData() {
-            const firstConfirm = await showModal("Are you absolutely sure you want to delete ALL data? This cannot be undone.", true, "⚠️ Warning: Critical Action");
-            if (!firstConfirm) return;
+async function completelyResetAllData() {
+    const activeYardId = getActiveYardId();
+    const firstConfirm = await showModal(`Are you absolutely sure you want to delete ALL data for Yard (${activeYardId})? This cannot be undone.`, true, "⚠️ Warning: Critical Action");
+    if (!firstConfirm) return;
 
-            const secondConfirm = await showModal("Final Confirmation: This will clear your entire Cash Book, Traders database, Labor logs, and Stock ledger permanently. Proceed?", true, "🚨 Final Warning");
-            if (!secondConfirm) return;
+    const secondConfirm = await showModal("Final Confirmation: This will clear your entire Cash Book, Traders database, Labor logs, and Stock ledger permanently for this yard. Proceed?", true, "🚨 Final Warning");
+    if (!secondConfirm) return;
 
-            state = { openingBalance: 0, entries: [], traders: [], labor: [], stockAdjustments: [] };
+    state = { openingBalance: 0, entries: [], traders: [], labor: [], stockAdjustments: [] };
 
-            const note = document.getElementById('save-note');
-            if (note) note.textContent = 'Purging remote system...';
+    const note = document.getElementById('save-note');
+    if (note) note.textContent = 'Purging yard data from remote system...';
 
-            try {
-                // Wipe transactions and stock adjustments in tandem
-                await Promise.all([
-                    supabaseClient.from('transactions').delete().neq('id', '00000000-0000-0000-0000-000000000000'),
-                    supabaseClient.from('stock_adjustments').delete().neq('id', '00000000-0000-0000-0000-000000000000')
-                ]);
-                if (note) note.textContent = 'All records successfully wiped from cloud.';
-            } catch (e) {
-                console.error("Database cloud purge failed:", e);
-                if (note) note.textContent = 'Wiped locally, cloud sync pending connection.';
-            }
+    try {
+        // Wipe transactions, stock adjustments, traders, labor, and settings strictly for the active yard ID
+        await Promise.all([
+            supabaseClient.from('transactions').delete().eq('yard_id', activeYardId),
+            supabaseClient.from('stock_adjustments').delete().eq('yard_id', activeYardId),
+            supabaseClient.from('traders').delete().eq('yard_id', activeYardId),
+            supabaseClient.from('labor').delete().eq('yard_id', activeYardId),
+            supabaseClient.from('app_settings').delete().eq('yard_id', activeYardId)
+        ]);
+        if (note) note.textContent = 'All yard records successfully wiped from cloud.';
+    } catch (e) {
+        console.error("Database cloud purge failed:", e);
+        if (note) note.textContent = 'Wiped locally, cloud sync pending connection.';
+    }
 
-            document.getElementById('opening-input').value = 0;
-            if (document.getElementById('stk-input-coconuts')) {
-                document.getElementById('stk-input-coconuts').value = '';
-                document.getElementById('stk-out-copra').value = '';
-                document.getElementById('stk-out-husk').value = '';
-                document.getElementById('stk-desc').value = '';
-            }
+    document.getElementById('opening-input').value = 0;
+    if (document.getElementById('stk-input-coconuts')) {
+        document.getElementById('stk-input-coconuts').value = '';
+        document.getElementById('stk-out-copra').value = '';
+        document.getElementById('stk-out-husk').value = '';
+        document.getElementById('stk-desc').value = '';
+    }
 
-            renderTraders();
-            renderLabor();
-            render();
+    renderTraders();
+    renderLabor();
+    render();
 
-            document.querySelector('[data-view="dashboard"]').click();
-            await showModal("System successfully reset to factory defaults.", false, "System Wiped");
-            document.getElementById('purge-lock-input').value = '';
-            checkPurgeLock();
-        }
+    document.querySelector('[data-view="dashboard"]').click();
+    await showModal("Yard data successfully reset.", false, "Yard Data Wiped");
+    document.getElementById('purge-lock-input').value = '';
+    checkPurgeLock();
+}
 
         function showModal(message, isConfirm = false, title = "Notice") {
             return new Promise((resolve) => {
