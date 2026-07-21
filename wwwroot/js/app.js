@@ -12,8 +12,8 @@ window.storage = {
     async get(key) {
         const note = document.getElementById('save-note');
         try {
-            // 1. Fetch live transactions, stakeholders, AND stock adjustments in parallel
-            const [txRes, traderRes, laborRes, stockRes] = await Promise.all([
+            // 1. Fetch live transactions, stakeholders, stock adjustments, and settings in parallel
+            const [txRes, traderRes, laborRes, stockRes, settingsRes] = await Promise.all([
                 supabaseClient.from('transactions').select('*'),
                 (async () => {
                     try { return await supabaseClient.from('traders').select('*'); }
@@ -25,6 +25,10 @@ window.storage = {
                 })(),
                 (async () => {
                     try { return await supabaseClient.from('stock_adjustments').select('*'); }
+                    catch (e) { return { data: [] }; }
+                })(),
+                (async () => {
+                    try { return await supabaseClient.from('app_settings').select('*').eq('key', 'openingBalance'); }
                     catch (e) { return { data: [] }; }
                 })()
             ]);
@@ -77,8 +81,14 @@ window.storage = {
 
                 const currentLocalState = JSON.parse(localStorage.getItem(key)) || {};
 
+                // Parse opening balance directly from Supabase settings row if present
+                let dbOpeningBalance = currentLocalState.openingBalance || 0;
+                if (settingsRes && settingsRes.data && settingsRes.data.length > 0) {
+                    dbOpeningBalance = parseFloat(settingsRes.data[0].value) || 0;
+                }
+
                 state = {
-                    openingBalance: currentLocalState.openingBalance || 0,
+                    openingBalance: dbOpeningBalance,
                     entries: cleanEntries,
                     traders: dbTraders.length > 0 ? dbTraders : (currentLocalState.traders || []),
                     labor: dbLabor.length > 0 ? dbLabor : (currentLocalState.labor || []),
@@ -205,6 +215,16 @@ window.storage = {
                 } catch (laborError) {
                     console.warn("Labor background sync failed:", laborError);
                 }
+            }
+
+            // --- 4. OPENING BALANCE SYNC ---
+            try {
+                await supabaseClient.from('app_settings').upsert({
+                    key: 'openingBalance',
+                    value: String(parsedState.openingBalance || 0)
+                }, { onConflict: 'key' });
+            } catch (settingsErr) {
+                console.warn("Opening balance sync failed:", settingsErr);
             }
 
             if (note) note.textContent = 'All data is saved automatically to the cloud.';
