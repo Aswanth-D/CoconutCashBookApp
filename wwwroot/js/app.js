@@ -303,13 +303,18 @@ async function completelyResetAllData() {
     const secondConfirm = await showModal("Final Confirmation: This will clear your entire Cash Book, Traders database, Labor logs, and Stock ledger permanently for this yard. Proceed?", true, "🚨 Final Warning");
     if (!secondConfirm) return;
 
+    // 1. Reset in-memory state
     state = { openingBalance: 0, entries: [], traders: [], labor: [], stockAdjustments: [] };
+
+    // 2. Clear local storage immediately
+    localStorage.removeItem(STORAGE_KEY);
+    localStorage.removeItem(DRAFT_KEY);
 
     const note = document.getElementById('save-note');
     if (note) note.textContent = 'Purging yard data from remote system...';
 
     try {
-        // Wipe transactions, stock adjustments, traders, labor, and settings strictly for the active yard ID
+        // Wipe records strictly for the active yard ID
         await Promise.all([
             supabaseClient.from('transactions').delete().eq('yard_id', activeYardId),
             supabaseClient.from('stock_adjustments').delete().eq('yard_id', activeYardId),
@@ -317,13 +322,25 @@ async function completelyResetAllData() {
             supabaseClient.from('labor').delete().eq('yard_id', activeYardId),
             supabaseClient.from('app_settings').delete().eq('yard_id', activeYardId)
         ]);
-        if (note) note.textContent = 'All yard records successfully wiped from cloud.';
+
+        // 3. Persist updated empty state to storage
+        if (window.storage && typeof window.storage.set === 'function') {
+            await window.storage.set(STORAGE_KEY, JSON.stringify(state));
+        } else {
+            localStorage.setItem(STORAGE_KEY, JSON.stringify(state));
+        }
+
+        if (note) note.textContent = 'All yard records successfully wiped from cloud and local storage.';
     } catch (e) {
         console.error("Database cloud purge failed:", e);
+        localStorage.setItem(STORAGE_KEY, JSON.stringify(state));
         if (note) note.textContent = 'Wiped locally, cloud sync pending connection.';
     }
 
-    document.getElementById('opening-input').value = 0;
+    // Reset inputs
+    const openingInput = document.getElementById('opening-input');
+    if (openingInput) openingInput.value = 0;
+
     if (document.getElementById('stk-input-coconuts')) {
         document.getElementById('stk-input-coconuts').value = '';
         document.getElementById('stk-out-copra').value = '';
@@ -331,17 +348,22 @@ async function completelyResetAllData() {
         document.getElementById('stk-desc').value = '';
     }
 
-    renderTraders();
-    renderLabor();
-    render();
+    // Safe render calls
+    if (typeof renderTraders === 'function') renderTraders();
+    if (typeof renderLabor === 'function') renderLabor();
+    if (typeof render === 'function') render();
 
-    document.querySelector('[data-view="dashboard"]').click();
+    const dashboardTab = document.querySelector('[data-view="dashboard"]');
+    if (dashboardTab) dashboardTab.click();
+
     await showModal("Yard data successfully reset.", false, "Yard Data Wiped");
-    document.getElementById('purge-lock-input').value = '';
-    checkPurgeLock();
+
+    const lockInput = document.getElementById('purge-lock-input');
+    if (lockInput) lockInput.value = '';
+    if (typeof checkPurgeLock === 'function') checkPurgeLock();
 }
 
-        function showModal(message, isConfirm = false, title = "Notice") {
+function showModal(message, isConfirm = false, title = "Notice") {
             return new Promise((resolve) => {
                 const modal = document.getElementById('custom-modal');
                 const titleEl = document.getElementById('modal-title');
@@ -365,7 +387,7 @@ async function completelyResetAllData() {
             });
         }
 
-        function downloadCSV() {
+function downloadCSV() {
             if (state.entries.length === 0) {
                 showModal("No entries recorded yet to create a download spreadsheet file.", false, "Export Empty");
                 return;
@@ -409,22 +431,22 @@ async function completelyResetAllData() {
             setTimeout(() => URL.revokeObjectURL(url), 100);
         }
 
-        function fmt(n) {
+function fmt(n) {
             n = Math.round(Number(n) || 0);
             return '₹' + n.toLocaleString('en-IN');
         }
-        function todayStr() {
+function todayStr() {
             return new Date().toISOString().slice(0, 10);
         }
 
-        function uid() {
+function uid() {
             // Generates a cryptographically secure, standard UUID v4 string
             return ([1e7] + -1e3 + -4e3 + -8e3 + -1e11).replace(/[018]/g, c =>
                 (c ^ crypto.getRandomValues(new Uint8Array(1))[0] & 15 >> c / 4).toString(16)
             );
         }
 
-        function saveDraft() {
+function saveDraft() {
             try {
                 const draft = {
                     date: document.getElementById('f-date').value,
@@ -440,7 +462,7 @@ async function completelyResetAllData() {
             } catch (e) { }
         }
 
-        function loadDraft() {
+function loadDraft() {
             try {
                 const raw = localStorage.getItem(DRAFT_KEY);
                 if (!raw) return;
@@ -458,7 +480,7 @@ async function completelyResetAllData() {
             } catch (e) { }
         }
 
-        function populateCategorySelect() {
+function populateCategorySelect() {
             const sel = document.getElementById('f-category');
             const prevVal = sel.value;
             sel.innerHTML = '';
@@ -472,8 +494,8 @@ async function completelyResetAllData() {
             }
 }
 
-        // --- Combined Traders & Labor Controller Logic ---
-        function switchCombinedView(type) {
+// --- Combined Traders & Labor Controller Logic ---
+function switchCombinedView(type) {
             currentViewType = type;
             combinedEditingId = null;
             
@@ -508,7 +530,7 @@ async function completelyResetAllData() {
             renderCombinedEntities();
         }
 
-        async function saveCombinedEntity() {
+async function saveCombinedEntity() {
             const nameEl = document.getElementById('entity-name');
             const phoneEl = document.getElementById('entity-phone');
             if (!nameEl) return;
@@ -551,7 +573,7 @@ async function completelyResetAllData() {
             render();
         }
 
-        function renderCombinedEntities() {
+function renderCombinedEntities() {
             const body = document.getElementById('combined-entity-body');
             if (!body) return;
             body.innerHTML = '';
@@ -608,7 +630,7 @@ async function completelyResetAllData() {
             body.querySelectorAll('.del-entity').forEach(b => b.addEventListener('click', () => deleteCombinedEntityWithConfirm(b.dataset.id)));
         }
 
-        function startCombinedEdit(id) {
+function startCombinedEdit(id) {
             const entity = currentViewType === 'trader' 
                 ? state.traders.find(x => x.id === id)
                 : state.labor.find(x => x.id === id);
@@ -621,7 +643,7 @@ async function completelyResetAllData() {
             document.getElementById('entity-cancel').style.display = 'inline-block';
         }
 
-        function cancelCombinedEdit() {
+function cancelCombinedEdit() {
             combinedEditingId = null;
             document.getElementById('entity-save').textContent = currentViewType === 'trader' ? 'Add Trader' : 'Add Worker';
             document.getElementById('entity-cancel').style.display = 'none';
@@ -629,7 +651,7 @@ async function completelyResetAllData() {
             document.getElementById('entity-phone').value = '';
         }
 
-        async function deleteCombinedEntityWithConfirm(id) {
+async function deleteCombinedEntityWithConfirm(id) {
             const entityName = currentViewType === 'trader' ? 'Trader' : 'Labor worker';
             const collection = currentViewType === 'trader' ? state.traders : state.labor;
             const item = collection.find(x => x.id === id);
@@ -653,7 +675,7 @@ async function completelyResetAllData() {
             render();
         }
 
-        function populateTraderSelect() {
+function populateTraderSelect() {
             const sel = document.getElementById('f-trader');
             const labelEl = document.getElementById('trader-field-label');
             const categoryEl = document.getElementById('f-category');
@@ -680,7 +702,7 @@ async function completelyResetAllData() {
             sel.value = prevSelection || '';
         }
 
-        function getTraderOrLaborName(id) {
+function getTraderOrLaborName(id) {
             if (!id) return '';
             const matchedTrader = state.traders.find(t => t.id === id);
             if (matchedTrader) return matchedTrader.name;
@@ -688,11 +710,11 @@ async function completelyResetAllData() {
             return matchedLabor ? matchedLabor.name : '';
         }
 
-        function sortedEntries() {
+function sortedEntries() {
             return [...state.entries].sort((a, b) => (a.date > b.date ? 1 : a.date < b.date ? -1 : (a._seq || 0) - (b._seq || 0)));
         }
 
-        function computeBalances() {
+function computeBalances() {
             const sorted = sortedEntries();
             let bal = state.openingBalance;
             return sorted.map(e => {
@@ -701,7 +723,7 @@ async function completelyResetAllData() {
             });
         }
 
-        async function saveProcessingBatch() {
+async function saveProcessingBatch() {
             const date = document.getElementById('stk-date').value;
             const inputCoconuts = parseFloat(document.getElementById('stk-input-coconuts').value);
             const outCopra = parseFloat(document.getElementById('stk-out-copra').value) || 0;
@@ -750,7 +772,7 @@ async function completelyResetAllData() {
             render();
         }
 
-        async function deleteProcessingBatch(batchId) {
+async function deleteProcessingBatch(batchId) {
             if (!await showModal("Permanently remove all stock changes linked to this processing batch?", true, "Confirm Deletion")) return;
             if (state.stockAdjustments) {
                 // Filter down array parameters locally
@@ -764,7 +786,7 @@ async function completelyResetAllData() {
             }
         }
 
-        function renderInventoryLedger() {
+function renderInventoryLedger() {
             const kpiContainer = document.getElementById('stock-kpis');
             const body = document.getElementById('inventory-body');
             if (!kpiContainer || !body) return;
@@ -924,7 +946,7 @@ async function completelyResetAllData() {
             });
         }
 
-        function matchDateRange(entryDate) {
+function matchDateRange(entryDate) {
             if (currentDateRange === 'all') return true;
 
             const targetDate = new Date(entryDate);
@@ -952,14 +974,14 @@ async function completelyResetAllData() {
             return true;
         }
 
-        function render() {
+function render() {
             renderCashBook();
             renderDashboard();
             renderSummary();
             renderInventoryLedger();
         }
 
-        async function toggleStatusDirectly(id) {
+async function toggleStatusDirectly(id) {
             const entry = state.entries.find(e => e.id === id);
             if (!entry) return;
             entry.status = (entry.status === 'Pending') ? 'Paid' : 'Pending';
@@ -967,7 +989,7 @@ async function completelyResetAllData() {
             render();
         }
 
-        function renderCashBook() {
+function renderCashBook() {
             const body = document.getElementById('entries-body');
             body.innerHTML = '';
             const withBal = computeBalances();
@@ -1011,7 +1033,7 @@ async function completelyResetAllData() {
             body.querySelectorAll('[data-copy]').forEach(b => b.addEventListener('click', () => quickCopyEntry(b.dataset.copy)));
         }
 
-        function quickCopyEntry(id) {
+function quickCopyEntry(id) {
             const e = state.entries.find(x => x.id === id);
             if (!e) return;
             cancelEdit();
@@ -1031,13 +1053,13 @@ async function completelyResetAllData() {
             window.scrollTo({ top: 0, behavior: 'smooth' });
         }
 
-        function escapeHtml(s) {
+function escapeHtml(s) {
             const d = document.createElement('div');
             d.textContent = s;
             return d.innerHTML;
         }
 
-        function renderDashboard() {
+function renderDashboard() {
             // 1. Calculate Cash Metrics
             const totalIn = state.entries.filter(e => e.type === 'in').reduce((s, e) => s + e.amount, 0);
             const totalOut = state.entries.filter(e => e.type === 'out').reduce((s, e) => s + e.amount, 0);
@@ -1102,7 +1124,7 @@ async function completelyResetAllData() {
             }
         }
 
-        function renderSummary() {
+function renderSummary() {
             const monthMap = {};
             state.entries.forEach(e => {
                 const m = e.date ? e.date.slice(0, 7) : 'unknown';
@@ -1219,7 +1241,7 @@ async function completelyResetAllData() {
             }
         }
 
-        function triggerUnitLabelUpdate() {
+function triggerUnitLabelUpdate() {
             const currentUnit = document.getElementById('f-unit').value;
             const convBox = document.getElementById('conversion-box');
 
@@ -1235,7 +1257,7 @@ async function completelyResetAllData() {
             }
         }
 
-        document.addEventListener('change', async (event) => {
+document.addEventListener('change', async (event) => {
             if (event.target && event.target.id === 'f-unit') {
                 triggerUnitLabelUpdate();
             }
@@ -1263,7 +1285,7 @@ async function completelyResetAllData() {
             }
         });
 
-        document.addEventListener('input', async (event) => {
+document.addEventListener('input', async (event) => {
             // Check if user is editing quantity or rate parameters
             if (event.target && (event.target.id === 'f-qty' || event.target.id === 'f-rate')) {
                 const categoryEl = document.getElementById('f-category');
@@ -1280,7 +1302,7 @@ async function completelyResetAllData() {
             }
         });
 
-        document.addEventListener('click', async (event) => {
+document.addEventListener('click', async (event) => {
             if (event.target && event.target.id === 'cancel-edit') {
                 cancelEdit();
             }
@@ -1487,7 +1509,7 @@ async function completelyResetAllData() {
             }
         });
 
-        function startEdit(id) {
+function startEdit(id) {
             const e = state.entries.find(x => x.id === id);
             if (!e) return;
             editingId = id;
@@ -1525,7 +1547,7 @@ async function completelyResetAllData() {
             window.scrollTo({ top: 0, behavior: 'smooth' });
         }
 
-        function cancelEdit(event) {
+function cancelEdit(event) {
             if (event) event.preventDefault(); // Prevents potential form submission interference
 
             editingId = null;
@@ -1543,7 +1565,7 @@ async function completelyResetAllData() {
             console.log("Edit cancelled, form cleared."); // Check your browser console (F12) to see if this logs
         }
 
-        function clearForm() {
+function clearForm() {
             document.getElementById('f-date').value = todayStr();
             document.getElementById('f-desc').value = '';
             document.getElementById('f-status').value = 'Paid';
@@ -1564,19 +1586,19 @@ async function completelyResetAllData() {
             try { localStorage.removeItem(DRAFT_KEY); } catch (e) { }
         }
 
-        async function deleteEntry(id) {
+async function deleteEntry(id) {
             if (!await showModal("Are you sure you want to permanently delete this cashbook entry?", true, "Confirm Deletion")) return;
             state.entries = state.entries.filter(e => e.id !== id);
             await window.storage.set(STORAGE_KEY, JSON.stringify(state));
             render();
         }
 
-        function updateTypeButtons() {
+function updateTypeButtons() {
             document.querySelector('.sel-in').classList.toggle('selected', currentType === 'in');
             document.querySelector('.sel-out').classList.toggle('selected', currentType === 'out');
         }
 
-        function suggestLastRate() {
+function suggestLastRate() {
             const currentCategory = document.getElementById('f-category').value;
             if (!currentCategory || !state.entries) return;
             const lastMatchingEntry = [...state.entries].reverse().find(e => e.category === currentCategory && e.rate);
@@ -1585,7 +1607,7 @@ async function completelyResetAllData() {
             }
         }
 
-        function initMenuDrawer() {
+function initMenuDrawer() {
             const menuToggle = document.getElementById("menuToggleBtn");
             const sidebar = document.querySelector("header");
         
@@ -1609,15 +1631,15 @@ async function completelyResetAllData() {
                 }
             });
         }
-        
-        // Fallback cascade initialization to ensure it catches the engine lifecycle
-        if (document.readyState === "loading") {
+
+// Fallback cascade initialization to ensure it catches the engine lifecycle
+if (document.readyState === "loading") {
             document.addEventListener("DOMContentLoaded", initMenuDrawer);
         } else {
             initMenuDrawer();
         }
 
-        async function init() {
+async function init() {
             // Bind the segmented control radio switch triggers cleanly at start
             document.querySelectorAll('input[name="entity-type-toggle"]').forEach(radio => {
                 radio.addEventListener('change', (e) => {
@@ -1678,4 +1700,4 @@ async function completelyResetAllData() {
                 }
             }, 10000);
         }
-        if (window.__partialsLoaded) { init(); } else { window.addEventListener('partialsLoaded', init); }
+if (window.__partialsLoaded) { init(); } else { window.addEventListener('partialsLoaded', init); }
