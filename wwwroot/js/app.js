@@ -264,7 +264,7 @@ window.storage = {
 
 const DRAFT_KEY = 'coconut-cashbook-draft';
 const CATEGORIES = {
-    in: ["Copra Sales", "Husk/Shell Sales", "Coconut Oil Sales", "Advance Received", "Other Income"],
+    in: ["Copra Sales", "Husk Sales", "Shell Sales", "Coconut Oil Sales", "Advance Received", "Other Income"],
     out: ["Coconut Purchase", "Labor Wages", "Transport/Freight", "Loading/Unloading", "Electricity/Fuel", "Commission/Brokerage", "Other Expense"]
 };
 
@@ -721,56 +721,68 @@ function computeBalances() {
                 bal += (e.type === 'in' ? e.amount : -e.amount);
                 return { ...e, balance: bal };
             });
-        }
+}
 
 async function saveProcessingBatch() {
-            const date = document.getElementById('stk-date').value;
-            const inputCoconuts = parseFloat(document.getElementById('stk-input-coconuts').value);
-            const outCopra = parseFloat(document.getElementById('stk-out-copra').value) || 0;
-            const outHusk = parseFloat(document.getElementById('stk-out-husk').value) || 0;
-            const description = document.getElementById('stk-desc').value.trim();
+    const date = document.getElementById('stk-date').value;
+    const inputCoconuts = parseFloat(document.getElementById('stk-input-coconuts').value);
+    const outCopra = parseFloat(document.getElementById('stk-out-copra').value) || 0;
+    const outHusk = parseFloat(document.getElementById('stk-out-husk').value) || 0;
+    const outShell = parseFloat(document.getElementById('stk-out-shell') ? document.getElementById('stk-out-shell').value : 0) || 0;
+    const description = document.getElementById('stk-desc').value.trim();
 
-            if (!date) {
-                await showModal('Please select an entry date.', false, 'Missing Date');
-                return;
-            }
-            if (isNaN(inputCoconuts) || inputCoconuts <= 0) {
-                await showModal('Please enter the number of raw coconuts used.', false, 'Invalid Input');
-                return;
-            }
+    if (!date) {
+        await showModal('Please select an entry date.', false, 'Missing Date');
+        return;
+    }
+    if (isNaN(inputCoconuts) || inputCoconuts <= 0) {
+        await showModal('Please enter the number of raw coconuts used.', false, 'Invalid Input');
+        return;
+    }
 
-            if (!state.stockAdjustments) {
-                state.stockAdjustments = [];
-            }
+    if (!state.stockAdjustments) {
+        state.stockAdjustments = [];
+    }
 
-            const batchId = 'batch-' + Date.now().toString(36);
-            const notes = description || `Batch processing run`;
+    const batchId = 'batch-' + Date.now().toString(36);
+    const notes = description || `Batch processing run`;
 
-            state.stockAdjustments.push({
-                id: uid(), batchId, date, commodity: 'Coconuts', direction: 'reduction', qty: inputCoconuts, description: `${notes} (Coconuts Used)`
-            });
+    // 1. Raw Coconuts Deducted
+    state.stockAdjustments.push({
+        id: uid(), batchId, date, commodity: 'Coconuts', direction: 'reduction', qty: inputCoconuts, description: `${notes} (Coconuts Used)`
+    });
 
-            if (outCopra > 0) {
-                state.stockAdjustments.push({
-                    id: uid(), batchId, date, commodity: 'Copra', direction: 'addition', qty: outCopra, description: `${notes} (Copra Yield)`
-                });
-            }
+    // 2. Copra Produced
+    if (outCopra > 0) {
+        state.stockAdjustments.push({
+            id: uid(), batchId, date, commodity: 'Copra', direction: 'addition', qty: outCopra, description: `${notes} (Copra Yield)`
+        });
+    }
 
-            if (outHusk > 0) {
-                state.stockAdjustments.push({
-                    id: uid(), batchId, date, commodity: 'Husk/Shell', direction: 'addition', qty: outHusk, description: `${notes} (Husk Yield)`
-                });
-            }
+    // 3. Husk Produced
+    if (outHusk > 0) {
+        state.stockAdjustments.push({
+            id: uid(), batchId, date, commodity: 'Husk', direction: 'addition', qty: outHusk, description: `${notes} (Husk Yield)`
+        });
+    }
 
-            await window.storage.set(STORAGE_KEY, JSON.stringify(state));
+    // 4. Shell Produced
+    if (outShell > 0) {
+        state.stockAdjustments.push({
+            id: uid(), batchId, date, commodity: 'Shell', direction: 'addition', qty: outShell, description: `${notes} (Shell Yield)`
+        });
+    }
 
-            document.getElementById('stk-input-coconuts').value = '';
-            document.getElementById('stk-out-copra').value = '';
-            document.getElementById('stk-out-husk').value = '';
-            document.getElementById('stk-desc').value = '';
+    await window.storage.set(STORAGE_KEY, JSON.stringify(state));
 
-            render();
-        }
+    document.getElementById('stk-input-coconuts').value = '';
+    document.getElementById('stk-out-copra').value = '';
+    document.getElementById('stk-out-husk').value = '';
+    if (document.getElementById('stk-out-shell')) document.getElementById('stk-out-shell').value = '';
+    document.getElementById('stk-desc').value = '';
+
+    render();
+}
 
 async function deleteProcessingBatch(batchId) {
             if (!await showModal("Permanently remove all stock changes linked to this processing batch?", true, "Confirm Deletion")) return;
@@ -784,167 +796,162 @@ async function deleteProcessingBatch(batchId) {
                 // Re-render dashboard balances alongside inventory ledger views
                 render(); 
             }
-        }
+}
 
 function renderInventoryLedger() {
-            const kpiContainer = document.getElementById('stock-kpis');
-            const body = document.getElementById('inventory-body');
-            if (!kpiContainer || !body) return;
-        
-            if (!document.getElementById('stk-date').value) {
-                document.getElementById('stk-date').value = todayStr();
+    const kpiContainer = document.getElementById('stock-kpis');
+    const body = document.getElementById('inventory-body');
+    if (!kpiContainer || !body) return;
+
+    if (!document.getElementById('stk-date').value) {
+        document.getElementById('stk-date').value = todayStr();
+    }
+
+    const inventoryTotals = { "Coconuts": 0, "Copra": 0, "Husk": 0, "Shell": 0, "Oil": 0 };
+    const stockMovements = [];
+
+    sortedEntries().forEach(e => {
+        const ledgerQty = e.stockQty !== undefined && e.stockQty !== null ? e.stockQty : (e.qty || 0);
+        if (ledgerQty <= 0) return;
+
+        let commodity = "Coconuts";
+        const cat = (e.category || '').toLowerCase();
+
+        if (cat.includes("copra")) commodity = "Copra";
+        else if (cat.includes("oil")) commodity = "Oil";
+        else if (cat.includes("water")) commodity = "Water";
+        else if (cat.includes("shell")) commodity = "Shell";
+        else if (cat.includes("husk")) commodity = "Husk";
+
+        const isPurchase = (e.type === 'out');
+
+        if (isPurchase) {
+            inventoryTotals["Coconuts"] += ledgerQty;
+        } else {
+            if (inventoryTotals[commodity] !== undefined) {
+                inventoryTotals[commodity] -= ledgerQty;
             }
-        
-            const inventoryTotals = { "Coconuts": 0, "Copra": 0, "Husk/Shell": 0, "Oil": 0 };
-            const stockMovements = [];
-        
-            sortedEntries().forEach(e => {
-                const ledgerQty = e.stockQty !== undefined && e.stockQty !== null ? e.stockQty : (e.qty || 0);
-                if (ledgerQty <= 0) return;
+        }
 
-                let commodity = "Coconuts";
-                const cat = (e.category || '').toLowerCase();
+        const directionText = isPurchase ? "➕ Inbound Stock Purchase" : "➖ Outbound Stock Sale";
 
-                if (cat.includes("copra")) commodity = "Copra";
-                else if (cat.includes("oil")) commodity = "Oil";
-                else if (cat.includes("water")) commodity = "Water";
-                else if (cat.includes("husk") || cat.includes("shell")) commodity = "Husk/Shell";
-        
-                const isPurchase = (e.type === 'out');
-        
-                // 🚨 THE REAL-WORLD FIX
-                if (isPurchase) {
-                    // Any purchase (Cash Out) ONLY adds to raw Coconuts.
-                    // It completely ignores Copra/Husk categories here because they aren't processed yet!
-                    inventoryTotals["Coconuts"] += ledgerQty;
+        const displayNotes = e.unit === 'Ton'
+            ? `${getTraderOrLaborName(e.trader) || 'Direct Transaction'} (${e.qty} Ton @ ₹${e.rate}/Ton)`
+            : (getTraderOrLaborName(e.trader) || 'Direct Transaction');
+
+        stockMovements.push({
+            date: e.date,
+            commodity: isPurchase ? "Coconuts" : commodity,
+            direction: directionText,
+            qty: ledgerQty,
+            rate: e.unit === 'Ton' ? 0 : (e.rate || 0),
+            party: displayNotes,
+            isAdjustment: false
+        });
+    });
+
+    if (state.stockAdjustments && Array.isArray(state.stockAdjustments)) {
+        state.stockAdjustments.forEach(adj => {
+            let commodity = adj.commodity;
+
+            if (commodity && commodity.includes("Shell")) {
+                commodity = "Shell";
+            } else if (commodity && commodity.includes("Husk")) {
+                commodity = "Husk";
+            } else if (commodity && commodity.includes("Copra")) {
+                commodity = "Copra";
+            } else if (commodity && commodity.includes("Coconut")) {
+                commodity = "Coconuts";
+            }
+
+            if (inventoryTotals[commodity] !== undefined) {
+                if (adj.direction === 'addition') {
+                    inventoryTotals[commodity] += adj.qty;
                 } else {
-                    // Sales (Cash In) cleanly deduct from the specific finished item sold
-                    inventoryTotals[commodity] -= ledgerQty;
+                    inventoryTotals[commodity] -= adj.qty;
                 }
-        
-                const directionText = isPurchase ? "➕ Inbound Stock Purchase" : "➖ Outbound Stock Sale";
-        
-                const displayNotes = e.unit === 'Ton'
-                    ? `${getTraderOrLaborName(e.trader) || 'Direct Transaction'} (${e.qty} Ton @ ₹${e.rate}/Ton)`
-                    : (getTraderOrLaborName(e.trader) || 'Direct Transaction');
-        
-                stockMovements.push({
-                    date: e.date,
-                    commodity: isPurchase ? "Coconuts" : commodity, // Force purchase to display as raw coconuts
-                    direction: directionText,
-                    qty: ledgerQty,
-                    rate: e.unit === 'Ton' ? 0 : (e.rate || 0),
-                    party: displayNotes,
-                    isAdjustment: false
-                });
+            }
+
+            stockMovements.push({
+                date: adj.date,
+                commodity: commodity,
+                direction: adj.direction === 'addition' ? "➕ Production Yield" : "➖ Processing Intake",
+                qty: adj.qty,
+                rate: 0,
+                party: adj.description || 'Internal Processing Run',
+                isAdjustment: true,
+                batchId: adj.batchId
             });
-        
-            // Account for batch process updates cleanly with standardized commodity tags
-            if (state.stockAdjustments && Array.isArray(state.stockAdjustments)) {
-                state.stockAdjustments.forEach(adj => {
-                    let commodity = adj.commodity;
+        });
+    }
 
-                    // Normalize variants like "Husk/Shell", "Husk Yield", or "Husk"
-                    if (commodity && (commodity.includes("Husk") || commodity.includes("Shell"))) {
-                        commodity = "Husk/Shell";
-                    } else if (commodity && commodity.includes("Copra")) {
-                        commodity = "Copra";
-                    } else if (commodity && commodity.includes("Coconut")) {
-                        commodity = "Coconuts";
-                    }
+    stockMovements.sort((a, b) => (a.date > b.date ? 1 : a.date < b.date ? -1 : 0));
 
-                    if (inventoryTotals[commodity] !== undefined) {
-                        if (adj.direction === 'addition') {
-                            inventoryTotals[commodity] += adj.qty;
-                        } else {
-                            inventoryTotals[commodity] -= adj.qty;
-                        }
-                    }
+    let totalCoconutsProcessed = 0;
+    let totalCopraProduced = 0;
 
-                    // ✨ PUSH BATCHES INTO THE LAYOUT DISPLAY GRID ARRAY
-                    stockMovements.push({
-                        date: adj.date,
-                        commodity: commodity,
-                        direction: adj.direction === 'addition' ? "➕ Production Yield" : "➖ Processing Intake",
-                        qty: adj.qty,
-                        rate: 0,
-                        party: adj.description || 'Internal Processing Run',
-                        isAdjustment: true,
-                        batchId: adj.batchId
-                    });
-                });
+    if (state.stockAdjustments && Array.isArray(state.stockAdjustments)) {
+        state.stockAdjustments.forEach(adj => {
+            if (adj.commodity === "Coconuts" && adj.direction === "reduction") {
+                totalCoconutsProcessed += adj.qty;
             }
-        
-            stockMovements.sort((a, b) => (a.date > b.date ? 1 : a.date < b.date ? -1 : 0));
-        
-            let totalCoconutsProcessed = 0;
-            let totalCopraProduced = 0;
-
-            if (state.stockAdjustments && Array.isArray(state.stockAdjustments)) {
-                state.stockAdjustments.forEach(adj => {
-                    if (adj.commodity === "Coconuts" && adj.direction === "reduction") {
-                        totalCoconutsProcessed += adj.qty;
-                    }
-                    if (adj.commodity === "Copra" && adj.direction === "addition") {
-                        totalCopraProduced += adj.qty;
-                    }
-                });
+            if (adj.commodity === "Copra" && adj.direction === "addition") {
+                totalCopraProduced += adj.qty;
             }
+        });
+    }
 
-            // Calculate conversion metrics safely to avoid division by zero
-            let yieldText = "No batches run yet";
-            if (totalCoconutsProcessed > 0 && totalCopraProduced > 0) {
-                const kgPerNut = (totalCopraProduced / totalCoconutsProcessed).toFixed(3);
-                const nutsPerKg = (totalCoconutsProcessed / totalCopraProduced).toFixed(1);
-                yieldText = `${kgPerNut} KG / nut (${nutsPerKg} nuts/KG)`;
-            }
+    let yieldText = "No batches run yet";
+    if (totalCoconutsProcessed > 0 && totalCopraProduced > 0) {
+        const kgPerNut = (totalCopraProduced / totalCoconutsProcessed).toFixed(3);
+        const nutsPerKg = (totalCoconutsProcessed / totalCopraProduced).toFixed(1);
+        yieldText = `${kgPerNut} KG / nut (${nutsPerKg} nuts/KG)`;
+    }
 
-
-            // --- 2. Render all 4 KPI Cards (Stock balances + Yield metrics) ---
-            kpiContainer.innerHTML = Object.keys(inventoryTotals).map(item => {
-                const displayUnit = item === "Copra" ? "KG" : "Units";
-                return `
+    kpiContainer.innerHTML = Object.keys(inventoryTotals).map(item => {
+        const displayUnit = item === "Copra" ? "KG" : "Units";
+        return `
             <div class="kpi">
                 <div class="label">${item} Balance Stock</div>
                 <div class="value" style="color: var(--palm-dark); font-weight: bold;">
                     ${inventoryTotals[item].toLocaleString()} ${displayUnit}
                 </div>
             </div>
-            `;
-                }).join('') + `
-            <div class="kpi" style="border-left: 4px solid var(--palm-dark, #2e7d32);">
-                <div class="label" style="color: var(--palm-dark); font-weight: 600;">Copra Yield Efficiency</div>
-                <div class="value" style="color: #1b5e20; font-size: 1.3rem;">${yieldText}</div>
-            </div>
         `;
-        
-            body.innerHTML = '';
-            if (stockMovements.length === 0) {
-                body.innerHTML = '<tr><td colspan="6" class="empty-note" style="padding:18px;">No stock logs found. Use the processing form to run transformations.</td></tr>';
-                return;
-            }
-        
-            const renderedBatches = new Set();
-        
-            stockMovements.reverse().forEach(sm => {
-                const tr = document.createElement('tr');
-                let actionMarkup = '';
-                if (sm.isAdjustment && sm.batchId && !renderedBatches.has(sm.batchId)) {
-                    actionMarkup = `<button onclick="deleteProcessingBatch('${sm.batchId}')" style="color:var(--rust-dark); background:none; border:none; cursor:pointer; font-size:11px; margin-left:8px; font-weight:bold;">❌ Delete Entire Batch</button>`;
-                    renderedBatches.add(sm.batchId);
-                }
-        
-                tr.innerHTML = `
-                        <td>${sm.date}</td>
-                        <td><span class="cat-tag">${sm.commodity}</span></td>
-                        <td style="font-weight: 600; color: ${sm.direction.includes('➕') ? 'var(--palm-dark)' : 'var(--rust-dark)'}">${sm.direction}</td>
-                        <td class="num">${sm.qty.toLocaleString()}</td>
-                        <td class="num">${sm.rate > 0 ? '₹' + sm.rate : '—'}</td>
-                        <td>${escapeHtml(sm.party)} ${actionMarkup}</td>
-                    `;
-                body.appendChild(tr);
-            });
+    }).join('') + `
+        <div class="kpi" style="border-left: 4px solid var(--palm-dark, #2e7d32);">
+            <div class="label" style="color: var(--palm-dark); font-weight: 600;">Copra Yield Efficiency</div>
+            <div class="value" style="color: #1b5e20; font-size: 1.3rem;">${yieldText}</div>
+        </div>
+    `;
+
+    body.innerHTML = '';
+    if (stockMovements.length === 0) {
+        body.innerHTML = '<tr><td colspan="6" class="empty-note" style="padding:18px;">No stock logs found. Use the processing form to run transformations.</td></tr>';
+        return;
+    }
+
+    const renderedBatches = new Set();
+
+    stockMovements.reverse().forEach(sm => {
+        const tr = document.createElement('tr');
+        let actionMarkup = '';
+        if (sm.isAdjustment && sm.batchId && !renderedBatches.has(sm.batchId)) {
+            actionMarkup = `<button onclick="deleteProcessingBatch('${sm.batchId}')" style="color:var(--rust-dark); background:none; border:none; cursor:pointer; font-size:11px; margin-left:8px; font-weight:bold;">❌ Delete Entire Batch</button>`;
+            renderedBatches.add(sm.batchId);
         }
+
+        tr.innerHTML = `
+            <td>${sm.date}</td>
+            <td><span class="cat-tag">${sm.commodity}</span></td>
+            <td style="font-weight: 600; color: ${sm.direction.includes('➕') ? 'var(--palm-dark)' : 'var(--rust-dark)'}">${sm.direction}</td>
+            <td class="num">${sm.qty.toLocaleString()}</td>
+            <td class="num">${sm.rate > 0 ? '₹' + sm.rate : '—'}</td>
+            <td>${escapeHtml(sm.party)} ${actionMarkup}</td>
+        `;
+        body.appendChild(tr);
+    });
+}
 
 function matchDateRange(entryDate) {
             if (currentDateRange === 'all') return true;
@@ -1057,72 +1064,80 @@ function escapeHtml(s) {
             const d = document.createElement('div');
             d.textContent = s;
             return d.innerHTML;
-        }
+}
 
 function renderDashboard() {
-            // 1. Calculate Cash Metrics
-            const totalIn = state.entries.filter(e => e.type === 'in').reduce((s, e) => s + e.amount, 0);
-            const totalOut = state.entries.filter(e => e.type === 'out').reduce((s, e) => s + e.amount, 0);
-            const balance = state.openingBalance + totalIn - totalOut;
-            const pendingIn = state.entries.filter(e => e.type === 'in' && e.status === 'Pending').reduce((s, e) => s + e.amount, 0);
-            const pendingOut = state.entries.filter(e => e.type === 'out' && e.status === 'Pending').reduce((s, e) => s + e.amount, 0);
+    // 1. Calculate Cash Metrics
+    const totalIn = state.entries.filter(e => e.type === 'in').reduce((s, e) => s + e.amount, 0);
+    const totalOut = state.entries.filter(e => e.type === 'out').reduce((s, e) => s + e.amount, 0);
+    const balance = state.openingBalance + totalIn - totalOut;
+    const pendingIn = state.entries.filter(e => e.type === 'in' && e.status === 'Pending').reduce((s, e) => s + e.amount, 0);
+    const pendingOut = state.entries.filter(e => e.type === 'out' && e.status === 'Pending').reduce((s, e) => s + e.amount, 0);
 
-            document.getElementById('kpi-balance').textContent = fmt(balance);
-            document.getElementById('kpi-in').textContent = fmt(totalIn);
-            document.getElementById('kpi-out').textContent = fmt(totalOut);
-            document.getElementById('kpi-pending-receivable').textContent = fmt(pendingIn);
-            document.getElementById('kpi-pending-payable').textContent = fmt(pendingOut);
+    document.getElementById('kpi-balance').textContent = fmt(balance);
+    document.getElementById('kpi-in').textContent = fmt(totalIn);
+    document.getElementById('kpi-out').textContent = fmt(totalOut);
+    document.getElementById('kpi-pending-receivable').textContent = fmt(pendingIn);
+    document.getElementById('kpi-pending-payable').textContent = fmt(pendingOut);
 
-            const thisMonth = todayStr().slice(0, 7);
-            const mIn = state.entries.filter(e => e.type === 'in' && e.date.slice(0, 7) === thisMonth).reduce((s, e) => s + e.amount, 0);
-            const mOut = state.entries.filter(e => e.type === 'out' && e.date.slice(0, 7) === thisMonth).reduce((s, e) => s + e.amount, 0);
-            document.getElementById('kpi-month-net').textContent = fmt(mIn - mOut);
+    const thisMonth = todayStr().slice(0, 7);
+    const mIn = state.entries.filter(e => e.type === 'in' && e.date.slice(0, 7) === thisMonth).reduce((s, e) => s + e.amount, 0);
+    const mOut = state.entries.filter(e => e.type === 'out' && e.date.slice(0, 7) === thisMonth).reduce((s, e) => s + e.amount, 0);
+    document.getElementById('kpi-month-net').textContent = fmt(mIn - mOut);
 
-            // 2. Calculate Real-Time Stock Metrics
-            const inventoryTotals = { "Coconuts": 0, "Copra": 0, "Husk/Shell": 0 };
+    // 2. Calculate Real-Time Stock Metrics (Separated Husk & Shell)
+    const inventoryTotals = { "Coconuts": 0, "Copra": 0, "Husk": 0, "Shell": 0 };
 
-            // Account for sales and purchases safely
-            state.entries.forEach(e => {
-                const ledgerQty = e.stockQty !== undefined && e.stockQty !== null ? e.stockQty : (e.qty || 0);
-                if (ledgerQty <= 0) return;
+    // Account for sales and purchases
+    state.entries.forEach(e => {
+        const ledgerQty = e.stockQty !== undefined && e.stockQty !== null ? e.stockQty : (e.qty || 0);
+        if (ledgerQty <= 0) return;
 
-                let commodity = "Coconuts";
-                if (e.category && e.category.includes("Copra")) commodity = "Copra";
-                else if (e.category && (e.category.includes("Husk") || e.category.includes("Shell"))) commodity = "Husk/Shell";
+        let commodity = "Coconuts";
+        const cat = (e.category || '').toLowerCase();
+        if (cat.includes("copra")) commodity = "Copra";
+        else if (cat.includes("shell")) commodity = "Shell";
+        else if (cat.includes("husk")) commodity = "Husk";
 
-                if (e.type === 'out') {
-                    inventoryTotals["Coconuts"] += ledgerQty; // Purchases strictly go to Raw Coconuts
-                } else {
-                    inventoryTotals[commodity] -= ledgerQty;  // Sales drop specific counts
-                }
-            });
-
-            // Account for batch process updates
-            if (state.stockAdjustments && Array.isArray(state.stockAdjustments)) {
-                state.stockAdjustments.forEach(adj => {
-                    if (inventoryTotals[adj.commodity] !== undefined) {
-                        if (adj.direction === 'addition') {
-                            inventoryTotals[adj.commodity] += adj.qty;
-                        } else {
-                            inventoryTotals[adj.commodity] -= adj.qty;
-                        }
-                    }
-                });
-            }
-
-            // Render Stock KPI cards onto Dashboard
-            const stockKpiContainer = document.getElementById('dashboard-stock-kpis');
-            if (stockKpiContainer) {
-                stockKpiContainer.innerHTML = Object.keys(inventoryTotals).map(item => `
-                    <div class="kpi">
-                        <div class="label">${item === "Coconuts" ? "Raw Coconuts" : item} On Hand</div>
-                        <div class="value" style="color: var(--palm-dark, #2e7d32); font-weight: bold;">
-                            ${inventoryTotals[item].toLocaleString()} ${item === "Copra" ? "KG" : "Units"}
-                        </div>
-                    </div>
-                `).join('');
+        if (e.type === 'out') {
+            inventoryTotals["Coconuts"] += ledgerQty;
+        } else {
+            if (inventoryTotals[commodity] !== undefined) {
+                inventoryTotals[commodity] -= ledgerQty;
             }
         }
+    });
+
+    // Account for processing batch updates
+    if (state.stockAdjustments && Array.isArray(state.stockAdjustments)) {
+        state.stockAdjustments.forEach(adj => {
+            let commodity = adj.commodity;
+            // Handle legacy "Husk/Shell" data safely if present
+            if (commodity === "Husk/Shell") commodity = "Husk";
+
+            if (inventoryTotals[commodity] !== undefined) {
+                if (adj.direction === 'addition') {
+                    inventoryTotals[commodity] += adj.qty;
+                } else {
+                    inventoryTotals[commodity] -= adj.qty;
+                }
+            }
+        });
+    }
+
+    // Render Stock KPI cards onto Dashboard
+    const stockKpiContainer = document.getElementById('dashboard-stock-kpis');
+    if (stockKpiContainer) {
+        stockKpiContainer.innerHTML = Object.keys(inventoryTotals).map(item => `
+            <div class="kpi">
+                <div class="label">${item === "Coconuts" ? "Raw Coconuts" : item} On Hand</div>
+                <div class="value" style="color: var(--palm-dark, #2e7d32); font-weight: bold;">
+                    ${inventoryTotals[item].toLocaleString()} ${item === "Copra" ? "KG" : "Units"}
+                </div>
+            </div>
+        `).join('');
+    }
+}
 
 function renderSummary() {
             const monthMap = {};
@@ -1169,7 +1184,8 @@ function renderSummary() {
                     "Coconuts": { in: 0, out: 0 },
                     "Copra": { in: 0, out: 0 },
                     "Oil": { in: 0, out: 0 },
-                    "Husk/Shell": { in: 0, out: 0 },
+                    "Husk": { in: 0, out: 0 },
+                    "Shell": { in: 0, out: 0 },
                     "Other/General": { in: 0, out: 0 }
                 };
 
