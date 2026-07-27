@@ -983,7 +983,9 @@ async function toggleStatusDirectly(id) {
 
 function renderCashBook() {
     const body = document.getElementById('entries-body');
-    body.innerHTML = '';
+    if (body) {
+        body.innerHTML = '';
+    }
     const withBal = computeBalances();
 
     const filteredEntries = withBal.filter(e => {
