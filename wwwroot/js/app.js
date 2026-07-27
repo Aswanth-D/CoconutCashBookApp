@@ -1129,7 +1129,9 @@ function renderSummary() {
     });
     const months = Object.keys(monthMap).sort();
     const mbody = document.getElementById('monthly-body');
-    mbody.innerHTML = '';
+    if (mbody) {
+        mbody.innerHTML = '';
+    }
     if (months.length === 0) {
         mbody.innerHTML = '<tr><td colspan="4" class="empty-note">No data yet.</td></tr>';
     } else {
@@ -1142,8 +1144,13 @@ function renderSummary() {
     }
 
     const catIn = document.getElementById('cat-in-body');
+    if (catIn) {
+        catIn.innerHTML = '';
+    }
     const catOut = document.getElementById('cat-out-body');
-    catIn.innerHTML = ''; catOut.innerHTML = '';
+    if (catOut) {
+        catOut.innerHTML = '';
+    }
     CATEGORIES.in.forEach(c => {
         const total = state.entries.filter(e => e.type === 'in' && e.category === c).reduce((s, e) => s + e.amount, 0);
         const tr = document.createElement('tr');
