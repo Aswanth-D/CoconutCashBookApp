@@ -65,14 +65,18 @@
                     <input type="number" id="f-qty" step="any" placeholder="e.g. 2500" style="width: 100%;">
                 </div>
                 <div id="conversion-box" style="flex: 1; min-width: 100px; display: none;">
-                    <label style="font-size: 12px; color: #5B3A20; margin-bottom: 4px; display: block;">Approx Units / Ton</label>
-                    <input type="number" id="f-conv" step="1" placeholder="e.g. 1000" style="width: 100%;">
+                    <label id="conv-field-label" style="font-size: 12px; color: #5B3A20; margin-bottom: 4px; display: block;">Total Coconut Count</label>
+                    <input type="number" id="f-conv" step="1" placeholder="e.g. 2500" style="width: 100%;">
                 </div>
                 <div style="flex: 1; min-width: 100px;">
                     <label id="rate-field-label" style="font-size: 12px; color: #5B3A20; margin-bottom: 4px; display: block;">Rate per unit (₹)</label>
                     <input type="number" id="f-rate" step="any" placeholder="e.g. 15" style="width: 100%;">
                 </div>
             </div>
+        </div>
+        <div class="field">
+            <label>Pending Amount (₹)</label>
+            <input type="number" id="entry-pending-amount" step="any" placeholder="Leave blank for full amount">
         </div>
         <div class="field full">
             <label>Notes (optional)</label>

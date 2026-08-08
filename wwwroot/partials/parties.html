@@ -1,11 +1,11 @@
-<h2 class="section-title" id="combined-section-title">Manage Traders & Labor</h2>
+<h2 class="section-title" id="combined-section-title">Manage Traders/Farmers & Labor</h2>
 
 <!-- Segmented Controller Toggle Interface -->
 <div class="toggle-container">
     <label class="toggle-label-text">TYPE</label>
     <div class="segmented-control">
         <input type="radio" id="toggle-trader" name="entity-type-toggle" value="trader" checked>
-        <label for="toggle-trader" class="segment-btn trader-btn">Traders</label>
+        <label for="toggle-trader" class="segment-btn trader-btn">Traders / Farmers</label>
 
         <input type="radio" id="toggle-labor" name="entity-type-toggle" value="labor">
         <label for="toggle-labor" class="segment-btn labor-btn">Labors</label>
@@ -16,8 +16,15 @@
 <div class="entry-form" style="margin-bottom:18px;">
     <div class="form-grid">
         <div class="field">
-            <label id="dynamic-name-label">Trader Name</label>
-            <input type="text" id="entity-name" placeholder="e.g. Murugan Traders">
+            <label id="dynamic-name-label">Trader / Farmer Name</label>
+            <input type="text" id="entity-name" placeholder="e.g. Murugan Traders or Ramesh Farmer">
+        </div>
+        <div class="field" id="party-type-field">
+            <label>Party Subtype</label>
+            <select id="entity-party-type" style="width: 100%; padding: 8px; border-radius: 6px; border: 1px solid var(--line);">
+                <option value="Trader" selected>Trader</option>
+                <option value="Farmer">Farmer</option>
+            </select>
         </div>
         <div class="field">
             <label>Phone (optional)</label>
@@ -26,7 +33,7 @@
     </div>
     <div class="form-actions">
         <button type="button" class="btn secondary" id="entity-cancel" onclick="cancelCombinedEdit()" style="display:none;">Cancel</button>
-        <button type="button" class="btn" id="entity-save" onclick="saveCombinedEntity()">Add Trader</button>
+        <button type="button" class="btn" id="entity-save" onclick="saveCombinedEntity()">Add Party</button>
     </div>
 </div>
 
@@ -35,7 +42,8 @@
     <table>
         <thead>
             <tr id="dynamic-table-headers">
-                <th>Trader Name</th>
+                <th>Name</th>
+                <th>Type</th>
                 <th>Phone</th>
                 <th style="text-align:right;">Net Balance</th>
                 <th></th>

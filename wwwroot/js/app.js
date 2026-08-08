@@ -5,6 +5,15 @@ const SUPABASE_URL = 'https://ocnfbgubhqvyxidlsdir.supabase.co';
 const SUPABASE_ANON_KEY = 'sb_publishable_JmfXhemd49Ej1J_bST4dWg_r_BnOzX0';
 const STORAGE_KEY = 'coconut-cashbook-data';
 
+// Helper to render status badges with pending amounts
+function getStatusBadge(entry) {
+    const pAmt = entry.pendingAmount !== undefined ? entry.pendingAmount : (entry.status === 'Pending' ? entry.amount : 0);
+    if (pAmt > 0) {
+        return `<span class="badge badge-pending">Pending (₹${pAmt.toLocaleString()})</span>`;
+    }
+    return `<span class="badge badge-completed">Completed</span>`;
+}
+
 // Helper to acquire active User/Yard Tenant ID dynamically
 function getActiveYardId() {
     // Looks for 'yard_id', and defaults to 'main' if it doesn't exist on Android yet
@@ -266,7 +275,7 @@ window.storage = {
 const DRAFT_KEY = 'coconut-cashbook-draft';
 const CATEGORIES = {
     in: ["Copra Sales", "Husk Sales", "Shell Sales", "Coconut Oil Sales", "Advance Received", "Other Income"],
-    out: ["Coconut Purchase", "Labor Wages", "Transport/Freight", "Loading/Unloading", "Electricity/Fuel", "Commission/Brokerage", "Other Expense"]
+    out: ["Coconut Purchase", "Coconut De-husking", "Labor Wages", "Transport/Freight", "Loading/Unloading", "Electricity/Fuel", "Commission/Brokerage", "Other Expense"]
 };
 
 let state = { openingBalance: 0, entries: [], traders: [], labor: [], stockAdjustments: [] };
@@ -494,6 +503,7 @@ function switchCombinedView(type) {
     combinedEditingId = null;
 
     const nameLabel = document.getElementById('dynamic-name-label');
+    const partyTypeGroup = document.getElementById('party-type-field');
     const nameInput = document.getElementById('entity-name');
     const saveBtn = document.getElementById('entity-save');
     const cancelBtn = document.getElementById('entity-cancel');
@@ -507,14 +517,16 @@ function switchCombinedView(type) {
     if (cancelBtn) cancelBtn.style.display = 'none';
 
     if (type === 'trader') {
-        if (nameLabel) nameLabel.textContent = 'Trader Name';
-        nameInput.placeholder = 'e.g. Murugan Traders';
-        if (saveBtn) saveBtn.textContent = 'Add Trader';
+        if (nameLabel) nameLabel.textContent = 'Trader / Farmer Name';
+        if (partyTypeGroup) partyTypeGroup.style.display = 'block';
+        nameInput.placeholder = 'e.g. Murugan Traders or Ramesh Farmer';
+        if (saveBtn) saveBtn.textContent = 'Add Party';
         if (tableHeaders) {
-            tableHeaders.innerHTML = `<th>Trader Name</th><th>Phone</th><th style="text-align:right;">Net Balance</th><th></th>`;
+            tableHeaders.innerHTML = `<th>Name</th><th>Type</th><th>Phone</th><th style="text-align:right;">Net Balance</th><th></th>`;
         }
     } else {
         if (nameLabel) nameLabel.textContent = 'Labor Worker Name';
+        if (partyTypeGroup) partyTypeGroup.style.display = 'none';
         nameInput.placeholder = 'e.g. Ramesh Kumar';
         if (saveBtn) saveBtn.textContent = 'Add Worker';
         if (tableHeaders) {
@@ -527,10 +539,12 @@ function switchCombinedView(type) {
 async function saveCombinedEntity() {
     const nameEl = document.getElementById('entity-name');
     const phoneEl = document.getElementById('entity-phone');
+    const partyTypeEl = document.getElementById('entity-party-type');
     if (!nameEl) return;
 
     const name = (nameEl.value || '').trim();
     const phone = phoneEl ? (phoneEl.value || '').trim() : '';
+    const partyType = partyTypeEl ? partyTypeEl.value : 'Trader';
 
     if (!name) {
         await showModal('Please enter a valid name.', false, 'Missing Name');
@@ -539,11 +553,35 @@ async function saveCombinedEntity() {
     }
 
     if (currentViewType === 'trader') {
+        const traderData = {
+            name: name,
+            phone: phone,
+            party_type: partyType
+        };
+
+        if (combinedEditingId) {
+            traderData.id = combinedEditingId;
+        }
+
+        const { data, error } = await supabaseClient
+            .from('traders')
+            .upsert(traderData)
+            .select();
+
+        if (error) {
+            console.error('Error saving trader:', error);
+            await showModal('Failed to save party: ' + error.message, false, 'Database Error');
+            return;
+        }
+
         if (combinedEditingId) {
             const t = state.traders.find(x => x.id === combinedEditingId);
-            if (t) Object.assign(t, { name, phone });
+            if (t) {
+                Object.assign(t, { name, phone, party_type: partyType, partyType: partyType });
+            }
         } else {
-            state.traders.push({ id: uid(), name, phone });
+            const newId = (data && data[0]) ? data[0].id : uid();
+            state.traders.push({ id: newId, name, phone, party_type: partyType, partyType: partyType });
         }
     } else {
         if (combinedEditingId) {
@@ -555,7 +593,7 @@ async function saveCombinedEntity() {
     }
 
     combinedEditingId = null;
-    document.getElementById('entity-save').textContent = currentViewType === 'trader' ? 'Add Trader' : 'Add Worker';
+    document.getElementById('entity-save').textContent = currentViewType === 'trader' ? 'Add Party' : 'Add Worker';
     document.getElementById('entity-cancel').style.display = 'none';
 
     await window.storage.set(STORAGE_KEY, JSON.stringify(state));
@@ -574,7 +612,7 @@ function renderCombinedEntities() {
 
     if (currentViewType === 'trader') {
         if (!state.traders || state.traders.length === 0) {
-            body.innerHTML = '<tr><td colspan="4" class="empty-note" style="padding:18px;">No traders yet.</td></tr>';
+            body.innerHTML = '<tr><td colspan="5" class="empty-note" style="padding:18px;">No parties added yet.</td></tr>';
             return;
         }
         state.traders.forEach(t => {
@@ -584,9 +622,12 @@ function renderCombinedEntities() {
             const netBal = totalIn - totalOut;
             let balColor = netBal > 0 ? '#2e7d32' : (netBal < 0 ? '#c62828' : '#2B2419');
 
+            const pType = t.party_type || t.partyType || 'Trader';
+
             const tr = document.createElement('tr');
             tr.innerHTML = `
                 <td>${escapeHtml(t.name)}</td>
+                <td><span class="cat-tag" style="background: ${pType === 'Farmer' ? '#e8f5e9' : '#e0f2fe'}; color: ${pType === 'Farmer' ? '#1b5e20' : '#0369a1'};">${escapeHtml(pType)}</span></td>
                 <td>${escapeHtml(t.phone || '')}</td>
                 <td class="num" style="font-weight:700; color:${balColor}; text-align:right;">${fmt(netBal)}</td>
                 <td class="row-actions">
@@ -633,6 +674,9 @@ function startCombinedEdit(id) {
     combinedEditingId = id;
     document.getElementById('entity-name').value = entity.name;
     document.getElementById('entity-phone').value = entity.phone || '';
+    if (currentViewType === 'trader' && document.getElementById('entity-party-type')) {
+        document.getElementById('entity-party-type').value = entity.party_type || entity.partyType || 'Trader';
+    }
     document.getElementById('entity-save').textContent = 'Save changes';
     document.getElementById('entity-cancel').style.display = 'inline-block';
 }
@@ -687,9 +731,11 @@ function populateTraderSelect() {
             sel.appendChild(opt);
         });
     } else {
-        if (labelEl) labelEl.textContent = "Trader";
+        if (labelEl) labelEl.textContent = "Trader / Farmer";
         state.traders.forEach(t => {
-            const opt = document.createElement('option'); opt.value = t.id; opt.textContent = t.name + (t.phone ? (' — ' + t.phone) : '');
+            const pType = t.party_type || t.partyType || 'Trader';
+            const pTypeTag = ` (${pType})`;
+            const opt = document.createElement('option'); opt.value = t.id; opt.textContent = t.name + pTypeTag + (t.phone ? (' — ' + t.phone) : '');
             sel.appendChild(opt);
         });
     }
@@ -721,7 +767,6 @@ async function saveProcessingBatch() {
     const date = document.getElementById('stk-date').value;
     const inputCoconuts = parseFloat(document.getElementById('stk-input-coconuts').value);
     const outCopra = parseFloat(document.getElementById('stk-out-copra').value) || 0;
-    const outHusk = parseFloat(document.getElementById('stk-out-husk').value) || 0;
     const outShell = parseFloat(document.getElementById('stk-out-shell') ? document.getElementById('stk-out-shell').value : 0) || 0;
     const description = document.getElementById('stk-desc').value.trim();
 
@@ -751,12 +796,6 @@ async function saveProcessingBatch() {
         });
     }
 
-    if (outHusk > 0) {
-        state.stockAdjustments.push({
-            id: uid(), batchId, date, commodity: 'Husk', direction: 'addition', qty: outHusk, description: `${notes} (Husk Yield)`
-        });
-    }
-
     if (outShell > 0) {
         state.stockAdjustments.push({
             id: uid(), batchId, date, commodity: 'Shell', direction: 'addition', qty: outShell, description: `${notes} (Shell Yield)`
@@ -767,7 +806,6 @@ async function saveProcessingBatch() {
 
     document.getElementById('stk-input-coconuts').value = '';
     document.getElementById('stk-out-copra').value = '';
-    document.getElementById('stk-out-husk').value = '';
     if (document.getElementById('stk-out-shell')) document.getElementById('stk-out-shell').value = '';
     document.getElementById('stk-desc').value = '';
 
@@ -788,8 +826,9 @@ function renderInventoryLedger() {
     const body = document.getElementById('inventory-body');
     if (!kpiContainer || !body) return;
 
-    if (!document.getElementById('stk-date').value) {
-        document.getElementById('stk-date').value = todayStr();
+    const stkDateEl = document.getElementById('stk-date');
+    if (stkDateEl && !stkDateEl.value) {
+        stkDateEl.value = todayStr();
     }
 
     const inventoryTotals = { "Coconuts": 0, "Copra": 0, "Husk": 0, "Shell": 0, "Oil": 0 };
@@ -798,6 +837,21 @@ function renderInventoryLedger() {
     sortedEntries().forEach(e => {
         const ledgerQty = e.stockQty !== undefined && e.stockQty !== null ? e.stockQty : (e.qty || 0);
         if (ledgerQty <= 0) return;
+
+        // Auto-add Husk stock on "Coconut De-husking" Cashbook entries
+        if (e.category === 'Coconut De-husking') {
+            inventoryTotals["Husk"] += ledgerQty;
+            stockMovements.push({
+                date: e.date,
+                commodity: "Husk",
+                direction: "➕ Husk Produced (De-husking)",
+                qty: ledgerQty,
+                rate: e.rate || 0,
+                party: getTraderOrLaborName(e.trader) || e.description || 'Coconut De-husking',
+                isAdjustment: false
+            });
+            return;
+        }
 
         let commodity = "Coconuts";
         const cat = (e.category || '').toLowerCase();
@@ -872,43 +926,16 @@ function renderInventoryLedger() {
 
     stockMovements.sort((a, b) => (a.date > b.date ? 1 : a.date < b.date ? -1 : 0));
 
-    let totalCoconutsProcessed = 0;
-    let totalCopraProduced = 0;
-
-    if (state.stockAdjustments && Array.isArray(state.stockAdjustments)) {
-        state.stockAdjustments.forEach(adj => {
-            if (adj.commodity === "Coconuts" && adj.direction === "reduction") {
-                totalCoconutsProcessed += adj.qty;
-            }
-            if (adj.commodity === "Copra" && adj.direction === "addition") {
-                totalCopraProduced += adj.qty;
-            }
-        });
-    }
-
-    let yieldText = "No batches run yet";
-    if (totalCoconutsProcessed > 0 && totalCopraProduced > 0) {
-        const kgPerNut = (totalCopraProduced / totalCoconutsProcessed).toFixed(3);
-        const nutsPerKg = (totalCoconutsProcessed / totalCopraProduced).toFixed(1);
-        yieldText = `${kgPerNut} KG / nut (${nutsPerKg} nuts/KG)`;
-    }
-
-    kpiContainer.innerHTML = Object.keys(inventoryTotals).map(item => {
-        const displayUnit = item === "Copra" ? "KG" : "Units";
-        return `
-            <div class="kpi">
-                <div class="label">${item} Balance Stock</div>
-                <div class="value" style="color: var(--palm-dark); font-weight: bold;">
-                    ${inventoryTotals[item].toLocaleString()} ${displayUnit}
-                </div>
+    // Display only Coconuts and Husk KPI summary cards
+    const visibleKpis = ["Coconuts", "Husk"];
+    kpiContainer.innerHTML = visibleKpis.map(item => `
+        <div class="kpi">
+            <div class="label">${item} Balance Stock</div>
+            <div class="value" style="color: var(--palm-dark); font-weight: bold;">
+                ${inventoryTotals[item].toLocaleString()} Units
             </div>
-        `;
-    }).join('') + `
-        <div class="kpi" style="border-left: 4px solid var(--palm-dark, #2e7d32);">
-            <div class="label" style="color: var(--palm-dark); font-weight: 600;">Copra Yield Efficiency</div>
-            <div class="value" style="color: #1b5e20; font-size: 1.3rem;">${yieldText}</div>
         </div>
-    `;
+    `).join('');
 
     body.innerHTML = '';
     if (stockMovements.length === 0) {
@@ -1057,8 +1084,21 @@ function renderDashboard() {
     const totalIn = state.entries.filter(e => e.type === 'in').reduce((s, e) => s + e.amount, 0);
     const totalOut = state.entries.filter(e => e.type === 'out').reduce((s, e) => s + e.amount, 0);
     const balance = state.openingBalance + totalIn - totalOut;
-    const pendingIn = state.entries.filter(e => e.type === 'in' && e.status === 'Pending').reduce((s, e) => s + e.amount, 0);
-    const pendingOut = state.entries.filter(e => e.type === 'out' && e.status === 'Pending').reduce((s, e) => s + e.amount, 0);
+
+    // Fixed: Only sum pending amounts for entries that are actually marked 'Pending'
+    const pendingIn = state.entries
+        .filter(e => e.type === 'in' && e.status === 'Pending')
+        .reduce((s, e) => {
+            const pAmt = (e.pendingAmount !== undefined && e.pendingAmount !== null) ? parseFloat(e.pendingAmount) : e.amount;
+            return s + pAmt;
+        }, 0);
+
+    const pendingOut = state.entries
+        .filter(e => e.type === 'out' && e.status === 'Pending')
+        .reduce((s, e) => {
+            const pAmt = (e.pendingAmount !== undefined && e.pendingAmount !== null) ? parseFloat(e.pendingAmount) : e.amount;
+            return s + pAmt;
+        }, 0);
 
     document.getElementById('kpi-balance').textContent = fmt(balance);
     document.getElementById('kpi-in').textContent = fmt(totalIn);
@@ -1076,6 +1116,11 @@ function renderDashboard() {
     state.entries.forEach(e => {
         const ledgerQty = e.stockQty !== undefined && e.stockQty !== null ? e.stockQty : (e.qty || 0);
         if (ledgerQty <= 0) return;
+
+        if (e.category === 'Coconut De-husking') {
+            inventoryTotals["Husk"] += ledgerQty;
+            return;
+        }
 
         let commodity = "Coconuts";
         const cat = (e.category || '').toLowerCase();
@@ -1109,11 +1154,12 @@ function renderDashboard() {
 
     const stockKpiContainer = document.getElementById('dashboard-stock-kpis');
     if (stockKpiContainer) {
-        stockKpiContainer.innerHTML = Object.keys(inventoryTotals).map(item => `
+        const visibleKpis = ["Coconuts", "Husk"];
+        stockKpiContainer.innerHTML = visibleKpis.map(item => `
             <div class="kpi">
                 <div class="label">${item === "Coconuts" ? "Raw Coconuts" : item} On Hand</div>
                 <div class="value" style="color: var(--palm-dark, #2e7d32); font-weight: bold;">
-                    ${inventoryTotals[item].toLocaleString()} ${item === "Copra" ? "KG" : "Units"}
+                    ${inventoryTotals[item].toLocaleString()} Units
                 </div>
             </div>
         `).join('');
@@ -1245,21 +1291,62 @@ function renderSummary() {
     }
 }
 
+// Dynamic label update function based on category and unit selections
 function triggerUnitLabelUpdate() {
-    const currentUnit = document.getElementById('f-unit').value;
+    const categoryEl = document.getElementById('f-category');
+    const unitEl = document.getElementById('f-unit');
     const convBox = document.getElementById('conversion-box');
+    const convLabel = document.getElementById('conv-field-label');
 
-    if (currentUnit === 'Ton') {
+    const currentCat = categoryEl ? categoryEl.value : '';
+    const currentUnit = unitEl ? unitEl.value : '';
+
+    if (currentCat === 'Coconut De-husking') {
+        document.getElementById('qty-field-label').textContent = 'No. of Coconuts';
+        document.getElementById('rate-field-label').textContent = 'De-husking Rate / Coconut (₹)';
+        if (convBox) convBox.style.display = 'none';
+    } else if (currentUnit === 'Ton') {
         document.getElementById('qty-field-label').textContent = 'Quantity (Tons)';
         document.getElementById('rate-field-label').textContent = 'Rate per Ton (₹)';
-        convBox.style.display = 'block';
+        if (convLabel) convLabel.textContent = 'Total Coconut Count';
+        if (convBox) convBox.style.display = 'block';
     } else {
         document.getElementById('qty-field-label').textContent = 'Quantity (Units)';
         document.getElementById('rate-field-label').textContent = 'Rate per Unit (₹)';
-        convBox.style.display = 'none';
-        document.getElementById('f-conv').value = '';
+        if (convBox) convBox.style.display = 'none';
+    }
+
+    calculateTotalAmount();
+}
+
+// Auto-calculation function: Amount = No. of Coconuts * Rate per Coconut
+function calculateTotalAmount() {
+    const qtyInput = document.getElementById('f-qty');
+    const rateInput = document.getElementById('f-rate');
+    const amountInput = document.getElementById('f-amount');
+
+    if (!qtyInput || !rateInput || !amountInput) return;
+
+    const qty = parseFloat(qtyInput.value) || 0;
+    const rate = parseFloat(rateInput.value) || 0;
+
+    if (qty > 0 && rate > 0) {
+        amountInput.value = (qty * rate).toFixed(2);
     }
 }
+
+// Event Listeners for Live Calculation
+document.addEventListener('input', (e) => {
+    if (e.target && (e.target.id === 'f-qty' || e.target.id === 'f-rate')) {
+        calculateTotalAmount();
+    }
+});
+
+document.addEventListener('change', (e) => {
+    if (e.target && (e.target.id === 'f-category' || e.target.id === 'f-unit')) {
+        triggerUnitLabelUpdate();
+    }
+});
 
 document.addEventListener('change', async (event) => {
     if (event.target && event.target.id === 'f-unit') {
@@ -1267,6 +1354,7 @@ document.addEventListener('change', async (event) => {
     }
     if (event.target && event.target.id === 'f-category') {
         populateTraderSelect();
+        triggerUnitLabelUpdate();
     }
     if (event.target && event.target.id === 'calc-toggle') {
         const calcFields = document.getElementById('calc-fields');
@@ -1316,31 +1404,60 @@ document.addEventListener('click', async (event) => {
             return;
         }
 
-        const desc = document.getElementById('f-desc').value.trim();
+        let desc = document.getElementById('f-desc').value.trim();
         const category = document.getElementById('f-category').value;
         const status = document.getElementById('f-status').value;
-        const amount = parseFloat(document.getElementById('f-amount').value);
+        let amount = parseFloat(document.getElementById('f-amount').value) || 0;
         const notes = document.getElementById('f-notes').value.trim();
         const trader = document.getElementById('f-trader').value || '';
-        const isCalcActive = document.getElementById('calc-toggle').checked;
 
-        const unit = isCalcActive ? document.getElementById('f-unit').value : 'Units';
-        const qty = isCalcActive ? parseFloat(document.getElementById('f-qty').value) || 0 : null;
-        const rate = isCalcActive ? parseFloat(document.getElementById('f-rate').value) || 0 : null;
-        const convFactor = isCalcActive ? parseInt(document.getElementById('f-conv').value) || 0 : 0;
+        // Partial pending amount support (Resets to 0 if status is Completed)
+        const pendingValEl = document.getElementById('f-pending-amount');
+        const pendingVal = pendingValEl ? pendingValEl.value.trim() : '';
+        let pendingAmount = 0;
 
+        if (status === 'Completed') {
+            pendingAmount = 0;
+        } else if (pendingVal !== '') {
+            pendingAmount = parseFloat(pendingVal) || 0;
+        } else {
+            pendingAmount = amount; // Default to full amount if marked Pending without custom input
+        }
+
+        const calcToggleEl = document.getElementById('calc-toggle');
+        const isCalcActive = calcToggleEl ? calcToggleEl.checked : false;
+        const isDehusking = category === 'Coconut De-husking';
+
+        // Read unit, qty, rate, and conversion factor
+        const unit = isDehusking ? 'Coconuts' : (isCalcActive ? document.getElementById('f-unit').value : 'Units');
+        const qty = (isCalcActive || isDehusking) ? (parseFloat(document.getElementById('f-qty').value) || 0) : null;
+        const rate = (isCalcActive || isDehusking) ? (parseFloat(document.getElementById('f-rate').value) || 0) : null;
+        const convFactor = isCalcActive ? (parseInt(document.getElementById('f-conv').value) || 0) : 0;
+
+        // 1. Auto-calculate total amount if quantity and rate are provided
+        if ((isCalcActive || isDehusking) && qty > 0 && rate > 0) {
+            amount = qty * rate;
+        }
+
+        // 2. Auto-generate description for De-husking if left blank
+        if (isDehusking && !desc) {
+            desc = `De-husking ${qty} coconuts @ ₹${rate}/coconut`;
+        }
+
+        // 3. Calculate stock quantity
         let stockQty = 0;
-        if (isCalcActive && qty > 0) {
+        if ((isCalcActive || isDehusking) && qty > 0) {
             if (unit === 'Ton') {
-                stockQty = convFactor > 0 ? Math.round(qty * convFactor) : 0;
+                stockQty = convFactor > 0 ? convFactor : 0;
             } else {
                 stockQty = Math.round(qty);
             }
-        } else if (!isCalcActive) {
+        } else if (!isCalcActive && !isDehusking) {
             const inlineMatches = desc.match(/\b\d+\b/);
             if (inlineMatches) stockQty = parseInt(inlineMatches[0], 10);
         }
 
+        // Validations
         if (!amount || amount <= 0) {
             await showModal('Enter an amount greater than 0.', false, 'Invalid Amount');
             return;
@@ -1349,25 +1466,82 @@ document.addEventListener('click', async (event) => {
             await showModal(`Please provide either a Description or select a stakeholder party.`, false, 'Missing Information');
             return;
         }
-
-        if (isCalcActive && stockQty <= 0) {
-            await showModal('Please specify a valid quantity greater than 0 to correctly update the Stock Ledger.', false, 'Invalid Quantity');
+        if ((isCalcActive || isDehusking) && stockQty <= 0) {
+            await showModal('Please specify a valid coconut count / quantity greater than 0.', false, 'Invalid Quantity');
             return;
         }
 
-        const openingVal = parseFloat(document.getElementById('opening-input').value);
+        const openingInputEl = document.getElementById('opening-input');
+        const openingVal = openingInputEl ? parseFloat(openingInputEl.value) : 0;
         state.openingBalance = isNaN(openingVal) ? 0 : openingVal;
 
+        const entryPayload = {
+            date,
+            description: desc,
+            category,
+            type: currentType,
+            status,
+            amount,
+            pendingAmount,
+            notes,
+            trader,
+            qty,
+            rate,
+            unit,
+            convFactor,
+            stockQty
+        };
+
+        // Supabase DB Sync (if initialized)
+        if (typeof supabaseClient !== 'undefined') {
+            const dbData = {
+                date,
+                description: desc,
+                category,
+                type: currentType,
+                status,
+                amount,
+                pending_amount: pendingAmount,
+                notes,
+                trader_id: trader || null,
+                qty,
+                rate,
+                unit,
+                conv_factor: convFactor,
+                stock_qty: stockQty
+            };
+
+            if (editingId) {
+                dbData.id = editingId;
+            }
+
+            const { data, error } = await supabaseClient
+                .from('entries')
+                .upsert(dbData)
+                .select();
+
+            if (error) {
+                console.error('Error saving entry to Supabase:', error);
+                await showModal('Failed to save entry: ' + error.message, false, 'Database Error');
+                return;
+            }
+
+            if (data && data[0] && data[0].id) {
+                entryPayload.id = data[0].id;
+            }
+        }
+
+        // Local state update
         if (editingId) {
             const e = state.entries.find(x => x.id === editingId);
-            Object.assign(e, { date, description: desc, category, type: currentType, status, amount, notes, trader, qty, rate, unit, convFactor, stockQty });
+            if (e) Object.assign(e, entryPayload);
             editingId = null;
         } else {
-            state.entries.push({
-                id: uid(), _seq: state.entries.length,
-                date, description: desc, category, type: currentType, status, amount, notes, trader, qty, rate, unit, convFactor, stockQty
-            });
+            if (!entryPayload.id) entryPayload.id = uid();
+            entryPayload._seq = state.entries.length;
+            state.entries.push(entryPayload);
         }
+
         await window.storage.set(STORAGE_KEY, JSON.stringify(state));
         clearForm();
         render();
